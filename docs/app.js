@@ -501,7 +501,7 @@
       (state.installPrompt ? '<button class="btn block" id="mInstall" style="margin-bottom:8px">Installer l\'application</button>' : '') +
       '<button class="btn block" id="mRefresh" style="margin-bottom:8px">Actualiser les données</button>' +
       '<button class="btn danger block" id="mLogout">Se déconnecter</button>' +
-      '<p class="hint">Version ' + esc(NATIVE ? BUILD.version + ' (Android)' : 'web') + '</p>' +
+      '<p class="hint">Version ' + esc(NATIVE ? BUILD.version + ' (Android)' : 'web') + ' · <a href="https://elhittiabdel-25.github.io/GOH/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>' +
       '<p class="hint">Les données viennent directement du Google Sheet de Gate of Hope. Toute modification faite dans la feuille apparaît ici à la prochaine actualisation (automatique toutes les ' + Math.round(REFRESH_MS / 1000) + ' s).</p>';
     openSheet(html);
     document.getElementById('mLogout').onclick = function () { if (window.confirm('Se déconnecter ?')) logout(); };
