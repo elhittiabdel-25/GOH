@@ -1,0 +1,4 @@
+node_modules/
+*.log
+# Ne jamais publier de données réelles du classeur
+test/fixture-real*.json

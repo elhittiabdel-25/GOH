@@ -1,0 +1,17 @@
+{
+  "PROJETS": [
+    ["ID", "Types de collectes", "Collectes en cours", "Budget global nécessaire (Dhs)", "Montant collecté (Dhs)", "Reste à collecter (Dhs)", "Situation actuelle "],
+    ["", "Cas médicaux", "Exemple : traitement mensuel pour un patient fictif", 2000, 500, 1500, ""],
+    ["", "", "Exemple : séances de rééducation fictives", 3000, 0, 3000, ""],
+    ["", "Mosquées ", "Exemple : rénovation d'une mosquée fictive", 50000, 12000, 38000, ""],
+    ["", "Actions pour Gaza\n\n", "Exemple : parrainage fictif", 10000, 10500, "-", "Objectif dépassé"]
+  ],
+  "PROJETS.OLD": [
+    ["Types de collectes", "Collectes en cours", "Budget global nécessaire (Dhs)", "Montant collecté (Dhs)", "Reste à collecter (Dhs)", "Situation actuelle "],
+    ["Cas médicaux", "Exemple : traitement mensuel pour un patient fictif", 2000, 2000, "-", "Collecte clôturée"],
+    ["", "Exemple : traitement mensuel pour un patient fictif", 2000, 2000, "-", "Collecte clôturée"],
+    ["", "Exemple : opération fictive", 8000, 8000, "-", "Collecte clôturée"],
+    ["Actions pour Gaza", "Exemple : parrainage fictif", 10000, 16000, "-", "Collecte clôturée"]
+  ],
+  "PROJETS CLAUDE": []
+}

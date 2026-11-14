@@ -1,0 +1,9 @@
+{
+  "name": "gate-of-hope",
+  "private": true,
+  "description": "Application de suivi des collectes de Gate of Hope (PWA + Google Apps Script)",
+  "scripts": {
+    "test": "node test/run-tests.js",
+    "dev": "node test/dev-server.js 8080"
+  }
+}
