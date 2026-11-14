@@ -6,5 +6,13 @@
     "test": "node test/run-tests.js",
     "dev": "node test/dev-server.js 8080",
     "video": "node test/video/server.js 8090 & sleep 2 && node test/video/record.js test/video/out; kill %1"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
   }
 }

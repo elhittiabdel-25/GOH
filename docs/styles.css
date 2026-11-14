@@ -56,7 +56,7 @@ button { cursor: pointer; }
 /* ---------- En-tête ---------- */
 .top {
   position: sticky; top: 0; z-index: 5; background: var(--primary); color: var(--primary-ink);
-  padding-top: env(safe-area-inset-top);
+  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top));
 }
 @media (prefers-color-scheme: dark) { .top { background: #0d2724; color: var(--text); } }
 .top .wrap { display: flex; align-items: center; gap: 10px; height: 56px; }
@@ -126,7 +126,7 @@ button { cursor: pointer; }
 
 /* ---------- Bouton flottant ---------- */
 .fab {
-  position: fixed; right: max(16px, calc(50% - 344px)); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 6;
+  position: fixed; right: max(16px, calc(50% - 344px)); bottom: calc(18px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))); z-index: 6;
   border: 0; border-radius: 999px; background: var(--accent); color: #fff; padding: 14px 20px; font-weight: 650;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .2); display: flex; align-items: center; gap: 8px;
 }
@@ -141,7 +141,7 @@ dialog#sheet {
 dialog#sheet::backdrop { background: rgba(10, 20, 18, .45); }
 dialog[open] { animation: up .2s ease-out; }
 @keyframes up { from { transform: translateY(30px); opacity: .5; } }
-.sheet-inner { overflow-y: auto; max-height: 92vh; max-height: 92dvh; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); }
+.sheet-inner { overflow-y: auto; max-height: 92vh; max-height: 92dvh; padding: 8px 16px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))); }
 .grab { width: 40px; height: 4px; border-radius: 9px; background: var(--line); margin: 4px auto 10px; }
 .sheet-head { display: flex; align-items: flex-start; gap: 8px; }
 .sheet-head h2 { font-size: 18px; margin: 0 0 4px; flex: 1; }
@@ -202,7 +202,7 @@ textarea.field { min-height: 96px; resize: vertical; }
 /* ---------- Divers ---------- */
 .banner { background: var(--accent-soft); color: var(--text); font-size: 13px; padding: 8px 12px; border-radius: 10px; margin-top: 12px; }
 #toast {
-  position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+  position: fixed; left: 50%; bottom: calc(90px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))); transform: translateX(-50%) translateY(20px);
   background: #1d2624; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none;
   transition: .25s; z-index: 50; max-width: calc(100% - 32px);
 }

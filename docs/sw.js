@@ -1,7 +1,7 @@
 // Service worker : met l'application en cache pour un démarrage rapide et hors connexion.
 // Les données (API) ne passent pas par ici : elles sont gardées par l'application elle-même.
-const VERSION = 'goh-v1';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest',
+const VERSION = 'goh-v2';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'build-info.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 
 self.addEventListener('install', (e) => {

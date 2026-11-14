@@ -1,0 +1,96 @@
+# Fabrique l'application Android (APK + AAB) à partir du dossier docs/ et la publie dans « Releases ».
+# Se lance à chaque modification de l'application, ou à la main (onglet Actions → « Run workflow »).
+name: Application Android
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', 'android/**', 'capacitor.config.json', 'package.json', 'package-lock.json', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOH_VERSION_CODE: ${{ github.run_number }}
+      GOH_VERSION_NAME: 1.0.${{ github.run_number }}
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Numéro de version dans l'application
+        run: |
+          echo "window.GOH_BUILD = { version: '${GOH_VERSION_NAME}', code: ${GOH_VERSION_CODE} };" > docs/build-info.js
+          cat docs/build-info.js
+
+      - name: Copie de l'application web dans le projet Android
+        run: npx cap sync android
+
+      - name: Clé de signature
+        if: env.HAS_KEY == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "GOH_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      - name: Fabrication (version signée)
+        if: env.HAS_KEY == 'true'
+        working-directory: android
+        env:
+          GOH_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          GOH_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          GOH_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease bundleRelease
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk ../dist/GateOfHope.apk
+          cp app/build/outputs/bundle/release/app-release.aab ../dist/GateOfHope.aab
+
+      - name: Fabrication (version de test, clé de signature absente)
+        if: env.HAS_KEY != 'true'
+        working-directory: android
+        run: |
+          echo "::warning::Secrets de signature absents : APK de test uniquement, pas de publication. Voir le README (section Android)."
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../dist
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist/GateOfHope-test.apk
+
+      - name: Fichiers produits (onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-of-hope-android-${{ env.GOH_VERSION_NAME }}
+          path: dist/*
+
+      - name: Publication dans « Releases »
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${GOH_VERSION_NAME}"
+          NOTES="Application Android Gate of Hope ${GOH_VERSION_NAME}.
+          Installer sur Android : télécharger GateOfHope.apk ci-dessous.
+          Play Store : utiliser GateOfHope.aab."
+          gh release create "$TAG" dist/GateOfHope.apk dist/GateOfHope.aab --title "Gate of Hope ${GOH_VERSION_NAME}" --notes "$NOTES" --latest \
+            || gh release upload "$TAG" dist/GateOfHope.apk dist/GateOfHope.aab --clobber

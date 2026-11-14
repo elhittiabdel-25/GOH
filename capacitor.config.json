@@ -1,0 +1,11 @@
+{
+  "appId": "org.gateofhope.collectes",
+  "appName": "Gate of Hope",
+  "webDir": "docs",
+  "android": {
+    "backgroundColor": "#0f5c55"
+  },
+  "plugins": {
+    "SystemBars": { "style": "DARK", "insetsHandling": "css" }
+  }
+}

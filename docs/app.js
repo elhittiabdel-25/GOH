@@ -3,6 +3,10 @@
   'use strict';
 
   var CFG = window.GOH_CONFIG || {};
+  var BUILD = window.GOH_BUILD || { version: 'web', code: 0 };
+  var NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  var RELEASES_API = 'https://api.github.com/repos/elhittiabdel-25/GOH/releases/latest';
+  var APK_URL = 'https://github.com/elhittiabdel-25/GOH/releases/latest/download/GateOfHope.apk';
   var REFRESH_MS = (CFG.REFRESH_SECONDS || 60) * 1000;
 
   /* ---------------- Stockage local (préférences + dernier état connu) ---------------- */
@@ -18,7 +22,7 @@
     tab: 'open', cat: '', q: '', closedLimit: 40,
     loading: false, offline: false, lastSync: LS.get('lastSync', null),
     seen: LS.get('seen', null),
-    recent: null, installPrompt: null
+    recent: null, installPrompt: null, update: null
   };
 
   /* ---------------- Utilitaires ---------------- */
@@ -322,6 +326,9 @@
   }
 
   function installBanner() {
+    if (NATIVE) {
+      return state.update ? '<div class="banner">Nouvelle version de l\'application disponible (' + esc(state.update) + '). <button class="link" style="color:inherit;font-weight:700" id="getUpdate">Télécharger</button></div>' : '';
+    }
     var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     if (standalone || LS.get('hideInstall', false)) return '';
     var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -338,6 +345,8 @@
       state.installPrompt.prompt();
       state.installPrompt.userChoice.then(function () { state.installPrompt = null; render(); });
     };
+    var gu = document.getElementById('getUpdate');
+    if (gu) gu.onclick = function () { window.open(APK_URL, '_blank'); };
     var hb = document.getElementById('hideInstall');
     if (hb) hb.onclick = function () { LS.set('hideInstall', true); render(); };
   }
@@ -492,6 +501,7 @@
       (state.installPrompt ? '<button class="btn block" id="mInstall" style="margin-bottom:8px">Installer l\'application</button>' : '') +
       '<button class="btn block" id="mRefresh" style="margin-bottom:8px">Actualiser les données</button>' +
       '<button class="btn danger block" id="mLogout">Se déconnecter</button>' +
+      '<p class="hint">Version ' + esc(NATIVE ? BUILD.version + ' (Android)' : 'web') + '</p>' +
       '<p class="hint">Les données viennent directement du Google Sheet de Gate of Hope. Toute modification faite dans la feuille apparaît ici à la prochaine actualisation (automatique toutes les ' + Math.round(REFRESH_MS / 1000) + ' s).</p>';
     openSheet(html);
     document.getElementById('mLogout').onclick = function () { if (window.confirm('Se déconnecter ?')) logout(); };
@@ -669,7 +679,22 @@
   window.addEventListener('online', function () { refresh(true); });
   setInterval(function () { if (document.visibilityState === 'visible' && !$sheet.open) refresh(true); }, REFRESH_MS);
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  if (NATIVE) {
+    var CapApp = window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    // Bouton « retour » d'Android : ferme la fenêtre ouverte, revient à l'onglet « En cours », puis quitte
+    if (CapApp) CapApp.addListener('backButton', function () {
+      if ($sheet.open) closeSheet();
+      else if (state.session && state.tab !== 'open') { state.tab = 'open'; state.cat = ''; render(); window.scrollTo(0, 0); }
+      else CapApp.exitApp();
+    });
+    // Nouvelle version publiée sur GitHub ?
+    if (BUILD.code > 0) {
+      fetch(RELEASES_API).then(function (r) { return r.ok ? r.json() : null; }).then(function (rel) {
+        var m = rel && String(rel.tag_name || '').match(/(\d+)$/);
+        if (m && Number(m[1]) > BUILD.code) { state.update = rel.tag_name; if (state.session) render(); }
+      }).catch(function () { /* hors connexion : on réessaiera au prochain lancement */ });
+    }
+  } else if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(function () { /* facultatif */ });
   }
 

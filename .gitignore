@@ -3,3 +3,6 @@ node_modules/
 # Ne jamais publier de données réelles du classeur
 test/fixture-real*.json
 test/video/out/
+# Clés de signature Android : ne jamais publier
+*.jks
+*.keystore
