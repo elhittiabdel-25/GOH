@@ -218,6 +218,7 @@
       var src = state.tab === 'open' ? d.cases : d.closed;
       var cats = [];
       src.forEach(function (c) { if (c.category && cats.indexOf(c.category) < 0) cats.push(c.category); });
+      if (isAdmin() && state.tab === 'open') html += '<button class="btn block new-case" id="newCase">' + ICON.plus + ' Nouvelle collecte</button>';
       html += '<div class="search">' + ICON.search + '<input id="q" type="search" placeholder="Rechercher (texte ou ID)…" value="' + esc(state.q) + '" aria-label="Rechercher"></div>';
       html += '<div class="chips">' + chip('', 'Toutes') + cats.map(function (c) { return chip(c, c); }).join('') + '</div>';
       html += state.tab === 'open' ? renderOpen(filter(src)) : renderClosed(filter(src));
@@ -366,6 +367,8 @@
     });
     var more = document.getElementById('more');
     if (more) more.onclick = function () { state.closedLimit += 60; render(); };
+    var nc = document.getElementById('newCase');
+    if (nc) nc.onclick = function () { caseForm(null); };
     var fab = document.getElementById('fab');
     if (fab) fab.onclick = function () { donationForm(null); };
     bindCancel($app);

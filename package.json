@@ -4,6 +4,7 @@
   "description": "Application de suivi des collectes de Gate of Hope (PWA + Google Apps Script)",
   "scripts": {
     "test": "node test/run-tests.js",
-    "dev": "node test/dev-server.js 8080"
+    "dev": "node test/dev-server.js 8080",
+    "video": "node test/video/server.js 8090 & sleep 2 && node test/video/record.js test/video/out; kill %1"
   }
 }

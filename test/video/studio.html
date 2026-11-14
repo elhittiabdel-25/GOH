@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Guide Gate of Hope</title>
+<style>
+  :root { --teal: #0f5c55; --gold: #e0ae55; --ink: #1d2624; --bg: #eef1ef; --grid: #e2e3e3; --sel: #1a73e8; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); }
+  #top { position: absolute; left: 0; top: 0; width: 1080px; height: 120px; background: var(--teal); color: #fff; display: flex; align-items: center; gap: 22px; padding: 0 36px; }
+  #top img { width: 72px; height: 72px; border-radius: 16px; }
+  #top .t { flex: 1; } #top .t b { font-size: 38px; display: block; } #top .t span { font-size: 26px; opacity: .85; }
+  #chap { background: var(--gold); color: #1d2624; font-weight: 700; font-size: 26px; padding: 10px 20px; border-radius: 99px; white-space: nowrap; max-width: 520px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- Google Sheet ---- */
+  #sheet { position: absolute; left: 20px; top: 136px; width: 1040px; height: 740px; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,.12); outline: 6px solid transparent; transition: outline-color .4s; }
+  .focus { outline-color: var(--gold) !important; }
+  #sheet > .label { right: 0; border-radius: 0 0 0 12px; }
+  .label { position: absolute; z-index: 3; background: var(--ink); color: #fff; font-size: 22px; font-weight: 700; padding: 6px 14px; border-radius: 0 0 12px 0; }
+  #s-head { height: 78px; display: flex; align-items: center; gap: 14px; padding: 0 18px 0 18px; border-bottom: 1px solid var(--grid); }
+  #s-head .logo { width: 40px; height: 52px; background: #0f9d58; border-radius: 6px; position: relative; }
+  #s-head .logo:after { content: ""; position: absolute; left: 9px; right: 9px; top: 14px; bottom: 12px; border: 3px solid #fff; border-radius: 2px; }
+  #s-head .name { font-size: 25px; } #s-head .menus { font-size: 20px; color: #444; display: flex; gap: 16px; margin-top: 2px; }
+  #s-head .menus b { color: var(--teal); }
+  #fbar { height: 50px; display: flex; align-items: center; border-bottom: 1px solid var(--grid); font-size: 22px; }
+  #fbar .ref { width: 90px; text-align: center; border-right: 1px solid var(--grid); height: 100%; display: grid; place-items: center; color: #555; }
+  #fbar .fx { padding: 0 10px; color: #888; font-style: italic; } #fbar .val { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, Menlo, monospace; font-size: 20px; }
+  #grid { position: absolute; top: 129px; left: 0; right: 0; bottom: 62px; overflow: hidden; }
+  table { border-collapse: collapse; table-layout: fixed; font-size: 22px; }
+  th, td { border: 1px solid var(--grid); height: 50px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  th { background: #f8f9fa; color: #555; font-weight: 500; font-size: 18px; height: 34px; }
+  td.rn { background: #f8f9fa; color: #555; text-align: center; font-size: 18px; padding: 0; }
+  tr.hdr td:not(.rn) { background: var(--teal); color: #fff; font-weight: 700; font-size: 19px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.f { color: #0b5394; }
+  td.sel { outline: 3px solid var(--sel); outline-offset: -3px; background: #e8f0fe; }
+  td.flash { animation: flash 3.2s ease-out; }
+  @keyframes flash { 0%, 35% { background: #ffe58a; } 100% { background: transparent; } }
+  td.typing:after { content: "|"; animation: blink .6s steps(1) infinite; color: var(--sel); }
+  @keyframes blink { 50% { opacity: 0; } }
+  #tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 62px; background: #f8f9fa; border-top: 1px solid var(--grid); display: flex; align-items: flex-end; gap: 4px; padding: 0 12px; font-size: 19px; overflow: hidden; }
+  #tabs div { padding: 12px 14px; color: #555; white-space: nowrap; border-radius: 8px 8px 0 0; }
+  #tabs div.on { background: #e1efe9; color: var(--teal); font-weight: 700; border-bottom: 4px solid var(--teal); }
+  #tabs div.muted { opacity: .5; }
+
+  /* ---- Téléphone ---- */
+  #phoneWrap { position: absolute; left: 34px; top: 900px; width: 527px; height: 1000px; background: #111; border-radius: 56px; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25); outline: 6px solid transparent; transition: outline-color .4s; }
+  #phoneClip { width: 491px; height: 964px; border-radius: 40px; overflow: hidden; background: #fff; position: relative; }
+  #phone { width: 390px; height: 766px; border: 0; transform: scale(1.259); transform-origin: 0 0; position: absolute; left: 0; top: 0; }
+  #phoneWrap .label { left: 40px; top: -22px; border-radius: 10px; }
+
+  /* ---- Légende ---- */
+  #cap { position: absolute; left: 590px; top: 920px; width: 466px; height: 960px; display: flex; flex-direction: column; justify-content: center; }
+  #capText { font-size: 40px; line-height: 1.32; font-weight: 600; transition: opacity .35s; }
+  #capText small { display: block; font-size: 30px; font-weight: 400; color: #4b5856; margin-top: 18px; line-height: 1.35; }
+  #capText b { color: var(--teal); }
+  #capText .k { background: #fff; border: 2px solid #c9d3d0; border-radius: 10px; padding: 0 10px; font-size: .85em; white-space: nowrap; }
+
+  /* ---- Cartes de chapitre ---- */
+  #card { position: absolute; inset: 0; background: var(--teal); color: #fff; display: flex; flex-direction: column; justify-content: center; padding: 90px; opacity: 0; pointer-events: none; transition: opacity .5s; z-index: 10; }
+  #card.on { opacity: 1; }
+  #card img { width: 170px; height: 170px; border-radius: 38px; margin-bottom: 50px; }
+  #card .n { font-size: 34px; color: var(--gold); font-weight: 700; margin-bottom: 16px; }
+  #card h1 { font-size: 78px; line-height: 1.1; margin: 0 0 30px; }
+  #card p { font-size: 40px; line-height: 1.4; margin: 0; opacity: .92; }
+  #card ul { font-size: 36px; line-height: 1.45; padding-left: 40px; margin: 10px 0 0; }
+  #card li { margin-bottom: 16px; }
+  #tap { position: absolute; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; background: rgba(224,174,85,.55); border: 4px solid var(--gold); z-index: 9; opacity: 0; pointer-events: none; }
+  #tap.go { animation: tap .7s ease-out; }
+  @keyframes tap { 0% { opacity: 1; transform: scale(.5); } 100% { opacity: 0; transform: scale(1.4); } }
+</style>
+</head>
+<body>
+  <div id="top"><img src="/app/icons/icon-192.png" alt=""><div class="t"><b>Gate of Hope</b><span>Guide de l'application des collectes</span></div><div id="chap"></div></div>
+
+  <div id="sheet">
+    <div class="label">Google Sheet</div>
+    <div id="s-head"><div class="logo"></div><div><div class="name">Collectes Gate of Hope</div>
+      <div class="menus"><span>Fichier</span><span>Édition</span><span>Affichage</span><span>Insertion</span><span>Données</span><span>Extensions</span><b>Gate of Hope</b></div></div></div>
+    <div id="fbar"><div class="ref" id="ref">A1</div><div class="fx">fx</div><div class="val" id="fval"></div></div>
+    <div id="grid"></div>
+    <div id="tabs"></div>
+  </div>
+
+  <div id="phoneWrap"><div class="label">Application</div><div id="phoneClip"><iframe id="phone" src="/app/"></iframe></div></div>
+  <div id="cap"><div id="capText"></div></div>
+  <div id="tap"></div>
+  <div id="card"></div>
+
+<script>
+const VIEWS = {
+  'PROJETS CLAUDE': [['A', 120], ['C', 360], ['D', 145], ['E', 150], ['F', 135], ['H', 80]],
+  'DONS': [['B', 150], ['C', 120], ['D', 76], ['E', 130], ['F', 200], ['G', 210], ['K', 104]],
+  'PROJETS.OLD CLAUDE': [['A', 110], ['C', 290], ['E', 140], ['G', 220], ['H', 80], ['J', 150]],
+  'MEMBRES': [['A', 240], ['B', 330], ['C', 120], ['D', 170], ['E', 110]],
+  'JOURNAL APP': [['A', 200], ['B', 250], ['C', 190], ['D', 330]]
+};
+const TABS = ['PROJETS', 'PROJETS.OLD', 'PROJETS CLAUDE', 'PROJETS.OLD CLAUDE', 'DONS', 'MEMBRES', 'JOURNAL APP'];
+const nf = new Intl.NumberFormat('fr-FR');
+let cur = 'PROJETS CLAUDE', data = null, prev = {}, sel = null, typing = null;
+const colIdx = (L) => L.charCodeAt(0) - 65;
+
+function fmt(v) {
+  if (v && typeof v === 'object' && v.d) {
+    return new Date(v.d).toLocaleDateString('fr-FR');
+  }
+  if (typeof v === 'number') return nf.format(Math.round(v * 100) / 100);
+  return v === null || v === undefined ? '' : String(v).replace(/\n/g, ' ');
+}
+const key = (v) => JSON.stringify(v);
+
+function draw(flash) {
+  const cols = VIEWS[cur], vals = data.values, fs = data.formulas;
+  const old = prev[cur];
+  const tw = 46 + cols.reduce((a, c) => a + c[1], 0);
+  let h = `<table style="width:${tw}px"><colgroup><col style="width:46px">` + cols.map(c => `<col style="width:${c[1]}px">`).join('') + '</colgroup>';
+  h += '<tr><th></th>' + cols.map(c => `<th>${c[0]}</th>`).join('') + '</tr>';
+  const nrows = Math.max(vals.length + 4, 14);
+  for (let r = 0; r < nrows; r++) {
+    h += `<tr class="${r === 0 ? 'hdr' : ''}"><td class="rn">${r + 1}</td>`;
+    for (const [L] of cols) {
+      const c = colIdx(L);
+      let v = vals[r] ? vals[r][c] : '', f = fs[r] ? fs[r][c] : '';
+      let cls = [];
+      if (typeof v === 'number') cls.push('num');
+      if (f) cls.push('f');
+      if (flash && r > 0 && old && key(old[r] ? old[r][c] : '') !== key(v === undefined ? '' : v)) cls.push('flash');
+      let txt = fmt(v);
+      if (typing && typing.r === r + 1 && typing.c === c) { txt = typing.text; cls.push('typing'); }
+      if (sel && sel.r === r + 1 && sel.c === c) cls.push('sel');
+      h += `<td class="${cls.join(' ')}" data-r="${r + 1}" data-c="${c}">${esc(txt)}</td>`;
+    }
+    h += '</tr>';
+  }
+  document.getElementById('grid').innerHTML = h + '</table>';
+  document.getElementById('tabs').innerHTML = TABS.map(t => `<div class="${t === cur ? 'on' : ''} ${/CLAUDE|DONS|MEMBRES|JOURNAL/.test(t) ? '' : 'muted'}">${t}</div>`).join('');
+  if (sel) {
+    const c = sel.c, r = sel.r - 1;
+    document.getElementById('ref').textContent = String.fromCharCode(65 + c) + sel.r;
+    const f = fs[r] ? fs[r][c] : '', v = vals[r] ? vals[r][c] : '';
+    document.getElementById('fval').textContent = typing ? typing.text : (f || fmt(v));
+  } else { document.getElementById('ref').textContent = ''; document.getElementById('fval').textContent = ''; }
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+async function load(flash = true) {
+  const d = await (await fetch('/dev/sheet?name=' + encodeURIComponent(cur))).json();
+  const changed = !data || key(d) !== key(data);
+  data = d;
+  if (changed || !flash) draw(flash && !!prev[cur]);
+  prev[cur] = d.values;
+}
+setInterval(() => { if (!typing) load(true); }, 1200);
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+window.studio = {
+  async tab(name) { prev[cur] = data && data.values; cur = name; sel = null; data = null; await load(false); },
+  async select(L, r) { sel = { c: colIdx(L), r }; draw(false); },
+  async type(L, r, text, speed = 70) {
+    sel = { c: colIdx(L), r }; typing = { c: sel.c, r, text: '' }; draw(false);
+    for (const ch of String(text)) { typing.text += ch; draw(false); await sleep(speed); }
+    await sleep(350);
+    typing = null;
+    prev[cur] = data.values;
+    await fetch('/dev/edit', { method: 'POST', body: JSON.stringify({ sheet: cur, row: r, col: sel.c + 1, value: text }) });
+    sel = { c: sel.c, r }; await load(true);
+  },
+  deselect() { sel = null; draw(false); },
+  say(html) {
+    const el = document.getElementById('capText');
+    el.style.opacity = 0;
+    setTimeout(() => { el.innerHTML = html; el.style.opacity = 1; }, 300);
+  },
+  chapter(t) { document.getElementById('chap').textContent = t; },
+  focus(which) {
+    document.getElementById('sheet').classList.toggle('focus', which === 'sheet' || which === 'both');
+    document.getElementById('phoneWrap').classList.toggle('focus', which === 'app' || which === 'both');
+  },
+  card(html) { const c = document.getElementById('card'); c.innerHTML = '<img src="/app/icons/icon-512.png" alt="">' + html; c.classList.add('on'); },
+  hideCard() { document.getElementById('card').classList.remove('on'); },
+  tap(x, y) { const t = document.getElementById('tap'); t.style.left = x + 'px'; t.style.top = y + 'px'; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go'); },
+  scrollGrid(y) { document.getElementById('grid').scrollTop = y; }
+};
+load(false);
+</script>
+</body>
+</html>

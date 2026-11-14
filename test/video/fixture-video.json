@@ -1,0 +1,20 @@
+{
+  "PROJETS": [
+    ["ID", "Types de collectes", "Collectes en cours", "Budget global nécessaire (Dhs)", "Montant collecté (Dhs)", "Reste à collecter (Dhs)", "Situation actuelle "],
+    ["", "Frais mensuels et loyers dûs", "Loyer dû de 6 mois pour une maman seule de 3 enfants (exemple fictif)", 9000, 4200, 4800, ""],
+    ["", "", "Frais de scolarité d'un orphelin de 12 ans (exemple fictif)", 12000, 7500, 4500, ""],
+    ["", "Cas médicaux", "Traitement mensuel pour un père de famille sans couverture médicale (exemple fictif)", 2000, 600, 1400, ""],
+    ["", "", "Opération de la cataracte pour une dame de 70 ans (exemple fictif)", 5000, 3100, 1900, ""],
+    ["", "Forages et aménagements de puits", "Forage d'un puits de 120 m pour un village de l'Atlas (exemple fictif)", 60000, 21000, 39000, ""],
+    ["", "Mosquées", "Rénovation de la salle de prière d'une mosquée de village (exemple fictif)", 30000, 12500, 17500, ""]
+  ],
+  "PROJETS.OLD": [
+    ["Types de collectes", "Collectes en cours", "Budget global nécessaire (Dhs)", "Montant collecté (Dhs)", "Reste à collecter (Dhs)", "Situation actuelle "],
+    ["Cas médicaux", "Traitement mensuel pour un père de famille sans couverture médicale (exemple fictif)", 2000, 2000, "-", "Collecte clôturée"],
+    ["", "Traitement mensuel pour un père de famille sans couverture médicale (exemple fictif)", 2000, 2000, "-", "Collecte clôturée"],
+    ["", "Séances de rééducation pour un jeune homme accidenté (exemple fictif)", 3000, 3000, "-", "Collecte clôturée"],
+    ["Actions pour Gaza", "Parrainage d'orphelins (exemple fictif)", 10000, 12000, "-", "Soit 12 orphelins parrainés => Collecte clôturée"],
+    ["Forages et aménagements de puits", "Panneaux solaires pour la pompe d'un puits (exemple fictif)", 25000, 25000, "-", "Collecte clôturée"]
+  ],
+  "PROJETS CLAUDE": []
+}
