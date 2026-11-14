@@ -61,7 +61,7 @@ comes from the case type). When a case returns, it keeps its ID and a new **cycl
 
 ### 3. Connect the app
 Paste the URL into [docs/config.js](docs/config.js) (`API_URL: '…'`), either by editing the file on GitHub (✏️)
-or by sending it to Claude. The app is published at **https://elhittiabdel-25.github.io/goh/**.
+or by sending it to Claude. The app is published at **https://elhittiabdel-25.github.io/GOH/**.
 
 ### 4. On each phone
 Open the address above, sign in with email + code, then:
