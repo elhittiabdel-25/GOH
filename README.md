@@ -72,6 +72,45 @@ Open the address above, sign in with email + code, then:
 Paste the new code, then **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**.
 The URL stays the same.
 
+## Android app
+
+The web app (`docs/`) is packaged as a native Android app with [Capacitor](https://capacitorjs.com)
+(`android/` folder). **GitHub Actions builds it automatically** on every change to the app
+(*Actions* tab → "Application Android") and publishes it under **Releases**:
+
+- `GateOfHope.apk`: to install directly on a phone (free).
+  Permanent download link: **https://github.com/elhittiabdel-25/GOH/releases/latest/download/GateOfHope.apk**
+- `GateOfHope.aab`: the file to upload to the Google Play Store (if you publish there some day).
+
+The app shows "New version available" when a newer release exists.
+iPhone users keep the web version installed on their home screen.
+
+### Signing key (once only)
+Android requires every version to be signed with **the same key**. It is never stored in this
+(public) repository: it lives in the repository's GitHub **secrets**.
+Settings → Secrets and variables → Actions → *New repository secret*, add these 4:
+
+| Name | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | contents of the key file encoded in base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | key password |
+| `ANDROID_KEY_ALIAS` | `gateofhope` |
+| `ANDROID_KEY_PASSWORD` | key password (the same one) |
+
+Then *Actions* → "Application Android" → **Run workflow**. Without these secrets, only a test
+APK is produced (in the *Actions* tab, not published).
+**Keep the `.jks` file and its password somewhere safe** (e.g. a private Google Drive): without them,
+you can never ship an update to the installed app again.
+
+### Installing on a phone
+1. Open the download link above on the Android phone.
+2. Open the downloaded file → allow "Install unknown apps" for the browser (once only).
+3. Install. To update: same procedure, with no need to uninstall.
+
+### Google Play Store (optional)
+Developer account ($25 once) → create the app → upload `GateOfHope.aab`.
+The key above serves as the *upload key*; enable "Play App Signing".
+
 ## Development
 ```bash
 npm test          # tests the script on an emulated sheet (fictional data)
