@@ -83,7 +83,9 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body)
     }).catch(function () {
-      var e = new Error('Pas de connexion internet.'); e.code = 'OFFLINE'; throw e;
+      var e = new Error(navigator.onLine === false ? 'Pas de connexion internet.'
+        : 'Impossible de joindre le serveur Google. (Admin : vérifiez que le déploiement Apps Script est accessible à « Tout le monde ».)');
+      e.code = 'OFFLINE'; throw e;
     }).then(function (res) {
       return res.json().catch(function () { throw new Error('Réponse inattendue du serveur (' + res.status + ').'); });
     }).then(function (j) {
