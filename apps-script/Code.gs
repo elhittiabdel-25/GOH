@@ -21,7 +21,7 @@ var CFG = {
   SRC_ACTIVE: 'PROJETS',
   SRC_ARCHIVE: 'PROJETS.OLD',
   TOKEN_DAYS: 120,
-  VERSION: '1.0.0'
+  VERSION: '1.0.1'
 };
 
 var H_CASE = ['ID', 'Types de collectes', 'Collectes en cours', 'Budget global nécessaire (Dhs)',
@@ -365,7 +365,7 @@ function sync_(opts) {
         notes.push(id + ' : montant tapé à la main transformé en ajustement de ' + fmt_(delta) + ' Dhs');
       }
       r.needsFormula = true;
-    } else if (String(f[0]).indexOf('$A' + row + ',') < 0 || String(f[1]).indexOf('$D' + row) < 0) {
+    } else if (String(f[0]).indexOf('$A' + row + argSep_()) < 0 || String(f[1]).indexOf('$D' + row + '=""' + argSep_()) < 0) {
       r.needsFormula = true;
     }
     if (changed || r.needsFormula) r[C.LAST] = now;
@@ -423,10 +423,38 @@ function sync_(opts) {
 }
 
 function setCaseFormulas_(sh, row) {
+  var x = argSep_();
   sh.getRange(row, C.COLL + 1, 1, 2).setFormulas([[
-    '=SUMIFS(DONS!$E:$E,DONS!$C:$C,$A' + row + ',DONS!$D:$D,$H' + row + ',DONS!$K:$K,"<>OUI")',
-    '=IF(OR($D' + row + '="",$E' + row + '>=$D' + row + '),"-",$D' + row + '-$E' + row + ')'
+    '=SUMIFS(DONS!$E:$E' + x + 'DONS!$C:$C' + x + '$A' + row + x + 'DONS!$D:$D' + x + '$H' + row + x + 'DONS!$K:$K' + x + '"<>OUI")',
+    '=IF(OR($D' + row + '=""' + x + '$E' + row + '>=$D' + row + ')' + x + '"-"' + x + '$D' + row + '-$E' + row + ')'
   ]]);
+}
+
+/**
+ * Séparateur d'arguments des formules : « , » (anglais) ou « ; » (français et autres langues
+ * à virgule décimale). Détecté une fois par paramètre régional du classeur, en testant une
+ * formule dans une cellule libre de JOURNAL APP, puis mémorisé.
+ */
+var ARG_SEP_CACHE_ = null;
+function argSep_() {
+  if (ARG_SEP_CACHE_) return ARG_SEP_CACHE_;
+  var ss = SpreadsheetApp.getActive();
+  var locale = '';
+  try { locale = ss.getSpreadsheetLocale(); } catch (e) { /* ignore */ }
+  var props = PropertiesService.getScriptProperties();
+  var key = 'ARG_SEP_' + locale;
+  var sep = props.getProperty(key);
+  if (!sep) {
+    var sh = ss.getSheetByName(CFG.JOURNAL) || ss.getSheets()[0];
+    var cell = sh.getRange(1, 26); // colonne Z, en dehors des données
+    cell.setFormula('=SUM(1,2)');
+    SpreadsheetApp.flush();
+    sep = String(cell.getDisplayValue()) === '3' ? ',' : ';';
+    cell.clearContent();
+    props.setProperty(key, sep);
+  }
+  ARG_SEP_CACHE_ = sep;
+  return sep;
 }
 
 /* ====================================================================== */

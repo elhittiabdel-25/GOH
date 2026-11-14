@@ -9,7 +9,8 @@ const { createContext } = require('./gas-mock');
 
 const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE || path.join(__dirname, 'fixture-demo.json'), 'utf8'));
 const expected = process.env.EXPECTED ? JSON.parse(fs.readFileSync(process.env.EXPECTED, 'utf8')) : null;
-const g = createContext(fixture, { quiet: true });
+const g = createContext(fixture, { quiet: true, locale: process.env.LOCALE || 'fr_FR' });
+console.log('Paramètre régional du classeur : ' + g.__ss.locale);
 const sheet = (n) => g.__ss.getSheetByName(n);
 const rows = (n) => { const s = sheet(n); return s.getLastRow() > 1 ? s.getRange(2, 1, s.getLastRow() - 1, 11).getValues() : []; };
 let passed = 0;
@@ -93,6 +94,7 @@ t('montant tapé à la main => ajustement + formule remise', () => {
   shA.getRange(2, 5).setValue(first.collected + 300);
   g.onEdit({ range: shA.getRange(2, 5) });
   assert.ok(String(shA.getRange(2, 5).getFormulas()[0][0]).startsWith('=SUMIFS'));
+  rows('PROJETS CLAUDE').forEach((r) => assert.ok(!String(r[4]).startsWith('#') && !String(r[5]).startsWith('#'), 'erreur de formule ' + r[0]));
   assert.strictEqual(shA.getRange(2, 5).getValues()[0][0], first.collected + 300);
   const last = rows('DONS').pop();
   assert.strictEqual(last[6], 'Ajustement feuille');
@@ -123,6 +125,16 @@ t('don saisi à la main dans DONS => complété et compté', () => {
   assert.strictEqual(list.cases.find((c) => c.id === first.id).collected, first.collected + 500);
 });
 
+t('anciennes formules à virgules (installation v1.0.0) réparées automatiquement', () => {
+  if (g.__ss.sep === ',') return;
+  const shA = sheet('PROJETS CLAUDE');
+  shA.getRange(3, 5, 1, 2).setFormulas([['=SUMIFS(DONS!$E:$E,DONS!$C:$C,$A3,DONS!$D:$D,$H3,DONS!$K:$K,"<>OUI")', '=IF(OR($D3="",$E3>=$D3),"-",$D3-$E3)']]);
+  assert.strictEqual(shA.getRange(3, 5).getValues()[0][0], '#ERROR!');
+  ok(g.api({ action: 'list', token: T }));
+  assert.ok(!String(shA.getRange(3, 5).getValues()[0][0]).startsWith('#'));
+  assert.ok(!String(shA.getRange(3, 6).getValues()[0][0]).startsWith('#'));
+});
+
 console.log('Cycle de vie');
 let reopened;
 t('clôture => déplacée vers PROJETS.OLD CLAUDE', () => {
@@ -136,7 +148,7 @@ t('clôture => déplacée vers PROJETS.OLD CLAUDE', () => {
 });
 t('formules des autres lignes toujours justes après suppression', () => {
   const shA = sheet('PROJETS CLAUDE');
-  for (let r = 2; r <= shA.getLastRow(); r++) assert.ok(shA.getRange(r, 5).getFormulas()[0][0].includes('$A' + r + ','), 'ligne ' + r);
+  for (let r = 2; r <= shA.getLastRow(); r++) assert.ok(shA.getRange(r, 5).getFormulas()[0][0].includes('$A' + r + g.__ss.sep), 'ligne ' + r);
   list = ok(g.api({ action: 'list', token: T }));
   rows('PROJETS CLAUDE').forEach((r) => assert.strictEqual(list.cases.find((c) => c.id === r[0]).collected, Number(r[4])));
 });
@@ -150,7 +162,7 @@ t('nouvelle collecte => nouvel ID par catégorie, insérée dans sa catégorie',
   const c = ok(g.api({ action: 'createCase', token: T, category: 'Mosquées', description: 'Nouvelle mosquée (test)', budget: 1000 })).case;
   assert.ok(/^MOS-\d{3}$/.test(c.id));
   const shA = sheet('PROJETS CLAUDE');
-  for (let r = 2; r <= shA.getLastRow(); r++) assert.ok(shA.getRange(r, 5).getFormulas()[0][0].includes('$A' + r + ','), 'ligne ' + r);
+  for (let r = 2; r <= shA.getLastRow(); r++) assert.ok(shA.getRange(r, 5).getFormulas()[0][0].includes('$A' + r + g.__ss.sep), 'ligne ' + r);
   list = ok(g.api({ action: 'list', token: T }));
   rows('PROJETS CLAUDE').forEach((r) => assert.strictEqual(list.cases.find((x) => x.id === r[0]).collected, Number(r[4])));
 });

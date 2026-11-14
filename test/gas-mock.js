@@ -28,6 +28,8 @@ class Range extends Chain {
     }
     return out;
   }
+  getDisplayValue() { const v = this.getValues()[0][0]; return String(v); }
+  setFormula(f) { return this.setFormulas([[f]]); }
   getFormulas() {
     const out = [];
     for (let i = 0; i < this.nr; i++) {
@@ -88,13 +90,18 @@ class Sheet {
 }
 
 class Spreadsheet {
-  constructor(data) { this.sheets = Object.entries(data).map(([n, rows]) => new Sheet(this, n, rows)); }
+  constructor(data, locale) { this.locale = locale || 'en_US'; this.sep = /^en/.test(this.locale) ? ',' : ';'; this.sheets = Object.entries(data).map(([n, rows]) => new Sheet(this, n, rows)); }
   getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
   insertSheet(n) { const s = new Sheet(this, n, []); this.sheets.push(s); return s; }
   getSheets() { return this.sheets; }
+  getSpreadsheetLocale() { return this.locale; }
   // Évalue uniquement les deux formules posées par le script
   _eval(sheet, row, f) {
-    const val = (col) => sheet._value(row, colToNum(col));
+    // Comme Google Sheets : une formule écrite avec le mauvais séparateur est une erreur d'analyse
+    const other = this.sep === ',' ? ';' : ',';
+    if (f.replace(/"[^"]*"/g, '').includes(other)) return '#ERROR!';
+    f = f.split(this.sep).join(',');
+    if (f === '=SUM(1,2)') return 3;
     let m = f.match(/^=SUMIFS\(DONS!\$E:\$E,DONS!\$C:\$C,\$A(\d+),DONS!\$D:\$D,\$H(\d+),DONS!\$K:\$K,"<>OUI"\)$/);
     if (m) {
       const id = sheet._value(Number(m[1]), 1), cyc = sheet._value(Number(m[2]), 8);
@@ -116,7 +123,7 @@ class Spreadsheet {
 }
 
 function createContext(data, opts = {}) {
-  const ss = new Spreadsheet(data);
+  const ss = new Spreadsheet(data, opts.locale);
   const props = {}, cache = {};
   const user = { email: opts.ownerEmail || 'owner@example.org' };
   const ctx = {
