@@ -231,3 +231,9 @@ details.holder > summary > span:first-child { flex: 1; }
 /* ---------- Accès visiteur ---------- */
 .or { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--muted); font-size: 13px; }
 .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* ---------- Message à copier ---------- */
+.copy-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin: -6px -6px -6px 2px; border-radius: 10px; color: var(--primary); }
+.copy-btn:active { background: var(--primary-soft); }
+.copy-btn svg { width: 19px; height: 19px; }
+pre.share { white-space: pre-wrap; word-break: break-word; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; }

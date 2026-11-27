@@ -70,6 +70,32 @@
   }
   function amt(n) { return '<span class="amt' + (n < 0 ? ' neg' : '') + '">' + dh(n) + '</span>'; }
 
+  /* ---------------- Message à copier (WhatsApp…) ---------------- */
+  function shareText(c) {
+    function n(x) { return String(Math.round((x || 0) * 100) / 100); }
+    var what = c.title || c.description;
+    var lines = [c.lastGift ? '+ ' + n(c.lastGift.amount) + 'dhs pour ' + what : what,
+      '-> *Budget collecté : ' + n(c.collected) + 'dhs hamdoulillah*'];
+    if (c.budget) lines.push(c.remaining > 0 ? '-> *Reste à collecter : ' + n(c.remaining) + 'dhs inchallah*' : '-> *Objectif atteint hamdoulillah*');
+    return lines.join('\n');
+  }
+  function canShare() { return !isVisitor() && state.data && state.data.serverTime; }
+  function copyText(text) {
+    function fallback() {
+      var t = document.createElement('textarea');
+      t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      ($sheet.open ? $sheetInner : document.body).appendChild(t);
+      t.select(); t.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* */ }
+      t.remove();
+      return ok;
+    }
+    var p = navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(text).then(function () { return true; }, fallback) : Promise.resolve(fallback());
+    return p.then(function (ok) { toast(ok ? 'Message copié, prêt à coller' : 'Copie impossible : sélectionnez le texte à la main'); return ok; });
+  }
+  function copyCase(id) { var c = findCase(id); if (c) copyText(shareText(c)); }
+
   function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function short(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 
@@ -87,6 +113,7 @@
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'
   };
 
@@ -305,7 +332,9 @@
       '<div class="card-head"><span class="tag id">' + esc(c.id) + '</span>' +
       (isNew ? '<span class="tag new">Nouvelle</span>' : delta > 0 ? '<span class="tag new">+' + dh(delta) + '</span>' : '') +
       (p !== null && p >= 100 ? '<span class="tag done">Objectif atteint</span>' : '') +
-      '<span class="muted small" style="margin-left:auto">' + esc(ago(c.updatedAt)) + '</span></div>' +
+      '<span class="muted small" style="margin-left:auto">' + esc(ago(c.updatedAt)) + '</span>' +
+      (canShare() ? '<span class="copy-btn" role="button" tabindex="0" data-copy="' + esc(c.id) + '" aria-label="Copier le message" title="Copier le message">' + ICON.copy + '</span>' : '') +
+      '</div>' +
       '<p class="desc">' + esc(c.description) + '</p>' + progress(c) +
       '<div class="nums"><span><b>' + dh(c.collected) + '</b>' + (c.budget ? ' <span class="muted">/ ' + dh(c.budget) + '</span>' : '') + '</span>' +
       '<span class="muted">' + (c.budget ? (c.remaining > 0 ? 'Reste ' + dh(c.remaining) : c.collected > c.budget ? 'Dépassé de ' + dh(c.collected - c.budget) : 'Objectif atteint') : 'Sans objectif fixe') + '</span></div>' +
@@ -392,6 +421,10 @@
     $app.querySelectorAll('[data-open]').forEach(function (b) {
       b.onclick = function () { openCase(b.dataset.open); };
     });
+    $app.querySelectorAll('[data-copy]').forEach(function (b) {
+      b.onclick = function (ev) { ev.stopPropagation(); ev.preventDefault(); copyCase(b.dataset.copy); };
+      b.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.stopPropagation(); ev.preventDefault(); copyCase(b.dataset.copy); } };
+    });
     var closedList = filter(state.data.closed);
     $app.querySelectorAll('[data-closed]').forEach(function (b) {
       b.onclick = function () { openClosed(closedList[Number(b.dataset.closed)]); };
@@ -475,6 +508,10 @@
       (c.situation ? '<p class="situation">' + esc(c.situation) + '</p>' : '') +
       '<p class="small muted">' + (c.responsable ? 'Responsable : <b>' + esc(c.responsable) + '</b> · ' : '') +
       (c.openedAt ? 'Ouverte le ' + esc(fmtDate(c.openedAt)) + ' · ' : '') + 'Mise à jour ' + esc(ago(c.updatedAt)) + '</p>';
+    if (canShare()) {
+      html += '<h3>Message à envoyer</h3><pre class="share">' + esc(shareText(c)) + '</pre>' +
+        '<button class="btn block" id="aCopy">' + ICON.copy + ' Copier le message</button>';
+    }
     if (isAdmin()) {
       html += '<div class="actions"><button class="btn primary" id="aDon">' + ICON.plus + ' Ajouter un don</button>' +
         '<button class="btn" id="aEdit">Modifier</button><button class="btn danger" id="aClose">Clôturer</button></div>' +
@@ -485,6 +522,8 @@
     html += historyHtml(c.id, c.cycle);
     openSheet(html, c.id);
     render();
+    var cp = document.getElementById('aCopy');
+    if (cp) cp.onclick = function () { copyText(shareText(c)); };
     if (isAdmin()) {
       document.getElementById('aDon').onclick = function () { donationForm(c.id); };
       document.getElementById('aEdit').onclick = function () { caseForm(c); };
@@ -795,6 +834,9 @@
     }
     html += categoryField(base.category) +
       '<label for="cDesc">Description</label><textarea class="field" id="cDesc" required>' + esc(base.description || '') + '</textarea>' +
+      '<label for="cTitle">Titre du message <span class="opt">(facultatif, pour le texte à copier)</span></label>' +
+      '<input class="field" id="cTitle" autocomplete="off" placeholder="ex. les frais d\'insuline de la petite diabétique de 3ans" value="' + esc(base.title || '') + '">' +
+      '<div class="hint">Donne : « + 500dhs pour <i>ce titre</i> ». Vide = la description est utilisée.</div>' +
       '<label for="cBud">Budget global nécessaire (Dhs) <span class="opt">(vide si pas d\'objectif fixe)</span></label>' +
       '<input class="field" id="cBud" inputmode="decimal" value="' + (editing && c.budget !== null ? esc(c.budget) : '') + '">' +
       '<label for="cSit">Situation actuelle <span class="opt">(facultatif)</span></label><textarea class="field" id="cSit" style="min-height:70px">' + esc(editing ? c.situation : '') + '</textarea>' +
@@ -845,6 +887,7 @@
       if (!desc) { err.textContent = 'La description est obligatoire.'; return; }
       if (budRaw && !(Number(budRaw) >= 0)) { err.textContent = 'Budget invalide.'; return; }
       var payload = { category: cat, description: desc, budget: budRaw === '' ? '' : Number(budRaw), situation: document.getElementById('cSit').value.trim() };
+      payload.title = document.getElementById('cTitle').value.trim();
       var $resp = document.getElementById('cResp');
       if ($resp) payload.responsable = $resp.value;
       busy(btn, true, 'Enregistrement…'); err.textContent = '';
