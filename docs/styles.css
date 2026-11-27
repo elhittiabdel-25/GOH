@@ -213,3 +213,17 @@ textarea.field { min-height: 96px; resize: vertical; }
 @media (max-width: 360px) { .stat b { font-size: 15px; } .two { grid-template-columns: 1fr; } }
 
 .new-case { margin-bottom: 10px; border-style: dashed; color: var(--primary); }
+
+/* ---------- Argent : qui a quoi ---------- */
+.neg, .amt.neg { color: var(--danger); }
+.money-total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; background: var(--primary-soft); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.money-total .amt { font-size: 22px; font-weight: 700; color: var(--primary); }
+.money-total span:not(.amt) { font-size: 13px; color: var(--muted); }
+details.holder { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: var(--surface); }
+details.holder > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; font-weight: 600; list-style: none; }
+details.holder > summary::-webkit-details-marker { display: none; }
+details.holder > summary::after { content: '▾'; color: var(--muted); margin-left: 4px; }
+details.holder[open] > summary::after { content: '▴'; }
+details.holder > .rows, details.holder > .hint { margin: 0 10px 10px; }
+.card .resp { margin: 6px 0 0; }
+details.holder > summary > span:first-child { flex: 1; }
