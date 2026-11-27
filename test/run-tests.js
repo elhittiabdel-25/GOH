@@ -326,4 +326,29 @@ t('accès visiteur désactivable', () => {
   g.PropertiesService.getScriptProperties().setProperty('VISITEURS', 'OUI');
   assert.ok(g.api({ action: 'publicList' }).ok);
 });
+console.log('Message à copier');
+t('titre du message enregistré, dernier vrai don renvoyé', () => {
+  const c = ok(g.api({ action: 'createCase', token: T, category: 'Cas médicaux', description: 'Description longue du cas', budget: 5500, title: "les frais d'insuline (test)" })).case;
+  assert.strictEqual(c.title, "les frais d'insuline (test)");
+  assert.strictEqual(c.lastGift, null);
+  ok(g.api({ action: 'addDonation', token: T, id: c.id, amount: 2100 }));
+  ok(g.api({ action: 'addDonation', token: T, id: c.id, amount: 500 }));
+  const l = ok(g.api({ action: 'list', token: T })).cases.find((x) => x.id === c.id);
+  assert.strictEqual(l.lastGift.amount, 500);
+  assert.strictEqual(l.collected, 2600);
+  assert.strictEqual(l.remaining, 2900);
+  const u = ok(g.api({ action: 'updateCase', token: T, id: c.id, title: 'nouveau titre' })).case;
+  assert.strictEqual(u.title, 'nouveau titre');
+  assert.strictEqual(u.responsable, adminName, 'responsable conservé');
+  const d = ok(g.api({ action: 'donations', token: T, id: c.id }));
+  ok(g.api({ action: 'cancelDonation', token: T, ref: d[0].ref }));
+  assert.strictEqual(ok(g.api({ action: 'list', token: T })).cases.find((x) => x.id === c.id).lastGift.amount, 2100, 'don annulé ignoré');
+});
+t('colonne « Titre du message » ajoutée lors de la mise à niveau', () => {
+  sheet('PROJETS CLAUDE').getRange(1, 12).setValue('');
+  g.PropertiesService.getScriptProperties().setProperty('SCHEMA', '2');
+  ok(g.api({ action: 'list', token: T }));
+  assert.strictEqual(sheet('PROJETS CLAUDE').getRange(1, 12).getValues()[0][0], 'Titre du message');
+  assert.strictEqual(sheet('PROJETS CLAUDE').getRange(1, 11).getValues()[0][0], 'Responsable');
+});
 console.log(`\n${passed} tests réussis`);

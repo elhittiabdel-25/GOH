@@ -27,14 +27,14 @@ var CFG = {
   SRC_ACTIVE: 'PROJETS',
   SRC_ARCHIVE: 'PROJETS.OLD',
   TOKEN_DAYS: 120,
-  VERSION: '1.2.0',
-  SCHEMA: 2          // 2 = suivi de l'argent (colonnes « Responsable », « Qui a l'argent », onglet MOUVEMENTS)
+  VERSION: '1.3.0',
+  SCHEMA: 3          // 2 = suivi de l'argent (« Responsable », « Qui a l'argent », MOUVEMENTS) ; 3 = « Titre du message »
 };
 
 var H_CASE = ['ID', 'Types de collectes', 'Collectes en cours', 'Budget global nécessaire (Dhs)',
   'Montant collecté (Dhs)', 'Reste à collecter (Dhs)', 'Situation actuelle', 'Cycle', 'Ouverte le'];
-var H_ACTIVE = H_CASE.concat(['Mise à jour le', 'Responsable']);
-var H_ARCHIVE = H_CASE.concat(['Clôturée le', 'Responsable']);
+var H_ACTIVE = H_CASE.concat(['Mise à jour le', 'Responsable', 'Titre du message']);
+var H_ARCHIVE = H_CASE.concat(['Clôturée le', 'Responsable', 'Titre du message']);
 var H_DONS = ['Réf', 'Date du don', 'ID collecte', 'Cycle', 'Montant (Dhs)', 'Donateur',
   'Mode de paiement', 'Note', 'Saisi par', 'Saisi le', 'Annulé', "Qui a l'argent"];
 var H_MVT = ['Réf', 'Date', 'ID collecte', 'Cycle', 'Montant (Dhs)', "De (qui avait l'argent)",
@@ -43,7 +43,7 @@ var H_MEMBRES = ['Nom', 'Email', 'Rôle (admin / membre)', "Code d'accès", 'Act
 var H_JOURNAL = ['Horodatage', 'Utilisateur', 'Action', 'Détails'];
 
 // Index (base 0) des colonnes
-var C = { ID: 0, CAT: 1, DESC: 2, BUDGET: 3, COLL: 4, RESTE: 5, SIT: 6, CYCLE: 7, OPEN: 8, LAST: 9, RESP: 10 };
+var C = { ID: 0, CAT: 1, DESC: 2, BUDGET: 3, COLL: 4, RESTE: 5, SIT: 6, CYCLE: 7, OPEN: 8, LAST: 9, RESP: 10, TITLE: 11 };
 var D = { REF: 0, DATE: 1, ID: 2, CYCLE: 3, AMT: 4, DONOR: 5, MODE: 6, NOTE: 7, BY: 8, AT: 9, CANCEL: 10, HOLDER: 11 };
 var MV = { REF: 0, DATE: 1, ID: 2, CYCLE: 3, AMT: 4, FROM: 5, TO: 6, NOTE: 7, BY: 8, AT: 9, CANCEL: 10 };
 
@@ -224,12 +224,12 @@ function install_(ss) {
 
   if (old.length) {
     shO.getRange(2, 1, old.length, H_ARCHIVE.length).setValues(old.map(function (r) {
-      return [r.id, r.cat, r.desc, r.budget, r.coll, r.reste, r.sit, r.cycle, '', '', ''];
+      return [r.id, r.cat, r.desc, r.budget, r.coll, r.reste, r.sit, r.cycle, '', '', '', ''];
     }));
   }
   if (src.length) {
     shA.getRange(2, 1, src.length, H_ACTIVE.length).setValues(src.map(function (r) {
-      return [r.id, r.cat, r.desc, r.budget, '', '', r.sit, r.cycle, today, now, ''];
+      return [r.id, r.cat, r.desc, r.budget, '', '', r.sit, r.cycle, today, now, '', ''];
     }));
     src.forEach(function (r, i) { setCaseFormulas_(shA, i + 2); });
     var dons = src.filter(function (r) { return num_(r.coll) > 0; }).map(function (r) {
@@ -618,12 +618,16 @@ function list_(user) {
   var O = readRows_(ss.getSheetByName(CFG.ARCHIVE), H_ARCHIVE.length);
   var Dn = readRows_(ss.getSheetByName(CFG.DONS), H_DONS.length);
   var sums = sumDonations_(Dn);
-  var lastDon = {};
-  Dn.forEach(function (r) {
+  var lastDon = {}, lastGift = {};
+  Dn.forEach(function (r, i) {
     if (isCancelled_(r)) return;
     var k = cleanId_(r[D.ID]) + '#' + num_(r[D.CYCLE]);
     var t = toDate_(r[D.AT]);
     if (t && (!lastDon[k] || t > lastDon[k])) lastDon[k] = t;
+    // dernier vrai don (pas les soldes repris ni les ajustements) : pour le message à copier
+    if (r[D.MODE] === MODE_OPENING || r[D.MODE] === MODE_ADJUST || !(num_(r[D.AMT]) > 0)) return;
+    var at = t ? t.getTime() : 0;
+    if (!lastGift[k] || at >= lastGift[k].at) lastGift[k] = { at: at, amount: num_(r[D.AMT]), date: iso_(r[D.DATE]) };
   });
 
   var cases = A.filter(function (r) { return String(r[C.DESC] || '').trim() && r[C.ID]; }).map(function (r) {
@@ -635,6 +639,8 @@ function list_(user) {
       budget: budget, collected: collected,
       remaining: budget === null ? null : Math.max(0, budget - collected),
       situation: String(r[C.SIT] || '').trim(), responsable: String(r[C.RESP] || '').trim(),
+      title: String(r[C.TITLE] || '').trim(),
+      lastGift: lastGift[id + '#' + cyc] ? { amount: lastGift[id + '#' + cyc].amount, date: lastGift[id + '#' + cyc].date } : null,
       openedAt: iso_(r[C.OPEN]), updatedAt: iso_(maxDate_(toDate_(r[C.LAST]), lastDon[id + '#' + cyc]))
     };
   });
@@ -645,6 +651,7 @@ function list_(user) {
       description: String(r[C.DESC]).trim(),
       budget: r[C.BUDGET] === '' ? null : num_(r[C.BUDGET]), collected: num_(r[C.COLL]),
       situation: String(r[C.SIT] || '').trim(), responsable: String(r[C.RESP] || '').trim(),
+      title: String(r[C.TITLE] || '').trim(),
       openedAt: iso_(r[C.OPEN]), closedAt: iso_(r[C.LAST])
     };
   });
@@ -769,7 +776,8 @@ function createCase_(b, user) {
   var resp = b.responsable ? memberName_(b.responsable, listMembers_(), true) : (user && user.name) || '';
   if (at <= A.length + 1) shA.insertRowBefore(at);
   var now = new Date();
-  shA.getRange(at, 1, 1, H_ACTIVE.length).setValues([[id, cat, desc, budget, '', '', String(b.situation || '').trim(), cycle, startOfDay_(now), now, resp]]);
+  shA.getRange(at, 1, 1, H_ACTIVE.length).setValues([[id, cat, desc, budget, '', '', String(b.situation || '').trim(), cycle, startOfDay_(now), now, resp,
+    String(b.title || '').trim().slice(0, 200)]]);
   // les formules des lignes décalées sont ajustées automatiquement par Sheets ; on pose celles de la nouvelle ligne
   setCaseFormulas_(shA, at);
   log_(user.email, 'nouvelle collecte', id + ' (cycle ' + cycle + ') ' + desc.slice(0, 80));
@@ -796,10 +804,11 @@ function updateCase_(b, user) {
   }
   set(C.SIT, 'situation', String(b.situation || '').trim());
   if (b.responsable !== undefined) set(C.RESP, 'responsable', b.responsable ? memberName_(b.responsable, listMembers_(), true) : '');
+  if (b.title !== undefined) set(C.TITLE, 'title', String(b.title || '').trim().slice(0, 200));
   if (changes.length) {
     f.sh.getRange(f.row, 1, 1, 4).setValues([[r[C.ID], r[C.CAT], r[C.DESC], r[C.BUDGET]]]);
     f.sh.getRange(f.row, C.SIT + 1).setValue(r[C.SIT]);
-    f.sh.getRange(f.row, C.RESP + 1).setValue(r[C.RESP]);
+    f.sh.getRange(f.row, C.RESP + 1, 1, 2).setValues([[r[C.RESP], r[C.TITLE]]]);
     f.sh.getRange(f.row, C.LAST + 1).setValue(new Date());
     log_(user.email, 'modification', id + ' : ' + changes.join(', '));
   }
@@ -820,7 +829,7 @@ function closeCase_(id, situation, who) {
   var shO = ss.getSheetByName(CFG.ARCHIVE);
   shO.insertRowBefore(2);
   shO.getRange(2, 1, 1, H_ARCHIVE.length).setValues([[id, r[C.CAT], r[C.DESC], budget, collected, reste, sit,
-    num_(r[C.CYCLE]), r[C.OPEN] || '', startOfDay_(new Date()), r[C.RESP] || '']]);
+    num_(r[C.CYCLE]), r[C.OPEN] || '', startOfDay_(new Date()), r[C.RESP] || '', r[C.TITLE] || '']]);
   shO.getRange(2, 1, 1, H_ARCHIVE.length).setFontWeight('normal').setBackground(null).setFontColor(null);
   if (f.sh.getMaxRows() <= 2) f.sh.getRange(f.row, 1, 1, H_ACTIVE.length).clearContent();
   else f.sh.deleteRow(f.row);
@@ -855,16 +864,19 @@ function upgrade_(ss, force) {
   var props = PropertiesService.getScriptProperties();
   if (!force && Number(props.getProperty('SCHEMA') || 0) >= CFG.SCHEMA) return [];
   var notes = [];
-  [[CFG.ACTIVE, H_ACTIVE], [CFG.ARCHIVE, H_ARCHIVE], [CFG.DONS, H_DONS]].forEach(function (p) {
+  // colonnes ajoutées depuis la v1.0 : à partir de la 11e (collectes) et de la 12e (DONS)
+  [[CFG.ACTIVE, H_ACTIVE, 11], [CFG.ARCHIVE, H_ARCHIVE, 11], [CFG.DONS, H_DONS, 12]].forEach(function (p) {
     var sh = ss.getSheetByName(p[0]);
     if (!sh) return;
-    var col = p[1].length, want = p[1][col - 1];
-    var cell = sh.getRange(1, col), cur = String(cell.getValues()[0][0] || '').trim();
-    if (!cur) {
-      cell.setValue(want);
-      notes.push('Colonne « ' + want + ' » ajoutée dans « ' + p[0] + ' »');
-    } else if (cur !== want) {
-      notes.push('Attention : la colonne ' + col + ' de « ' + p[0] + ' » contient « ' + cur + ' » au lieu de « ' + want + ' »');
+    for (var col = p[2]; col <= p[1].length; col++) {
+      var want = p[1][col - 1];
+      var cell = sh.getRange(1, col), cur = String(cell.getValues()[0][0] || '').trim();
+      if (!cur) {
+        cell.setValue(want);
+        notes.push('Colonne « ' + want + ' » ajoutée dans « ' + p[0] + ' »');
+      } else if (cur !== want) {
+        notes.push('Attention : la colonne ' + col + ' de « ' + p[0] + ' » contient « ' + cur + ' » au lieu de « ' + want + ' »');
+      }
     }
   });
   if (!ss.getSheetByName(CFG.MOUVEMENTS)) {
@@ -885,8 +897,8 @@ function formatMoney_(ss) {
       sh.setColumnWidth(col, 140);
     };
     var a = ss.getSheetByName(CFG.ACTIVE), o = ss.getSheetByName(CFG.ARCHIVE), d = ss.getSheetByName(CFG.DONS);
-    if (a) { head(a, C.RESP + 1); if (names) a.getRange('K2:K').setDataValidation(names); }
-    if (o) head(o, C.RESP + 1);
+    if (a) { head(a, C.RESP + 1); head(a, C.TITLE + 1); a.setColumnWidth(C.TITLE + 1, 260); if (names) a.getRange('K2:K').setDataValidation(names); }
+    if (o) { head(o, C.RESP + 1); head(o, C.TITLE + 1); }
     if (d) { head(d, D.HOLDER + 1); if (names) d.getRange('L2:L').setDataValidation(names); }
     var mv = ss.getSheetByName(CFG.MOUVEMENTS);
     if (mv) {
