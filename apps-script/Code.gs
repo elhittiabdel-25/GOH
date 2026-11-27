@@ -27,7 +27,7 @@ var CFG = {
   SRC_ACTIVE: 'PROJETS',
   SRC_ARCHIVE: 'PROJETS.OLD',
   TOKEN_DAYS: 120,
-  VERSION: '1.1.0',
+  VERSION: '1.2.0',
   SCHEMA: 2          // 2 = suivi de l'argent (colonnes « Responsable », « Qui a l'argent », onglet MOUVEMENTS)
 };
 
@@ -70,6 +70,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Gate of Hope')
     .addItem('Clôturer la collecte sélectionnée', 'menuCloturer')
     .addItem('Vérifier / réparer les onglets', 'menuVerifier')
+    .addItem('Accès visiteur : activer / désactiver', 'menuVisiteur')
     .addSeparator()
     .addItem('Installer (première fois uniquement)', 'installer')
     .addToUi();
@@ -93,6 +94,25 @@ function onEdit(e) {
   } catch (err) {
     console.error(err);
   }
+}
+
+/** Accès visiteur (sans connexion, lecture seule) : activé par défaut, désactivable ici. */
+function visitorEnabled_() {
+  return PropertiesService.getScriptProperties().getProperty('VISITEURS') !== 'NON';
+}
+
+function menuVisiteur() {
+  var ui = SpreadsheetApp.getUi();
+  var on = visitorEnabled_();
+  var resp = ui.alert('Accès visiteur',
+    'L\'accès visiteur est actuellement ' + (on ? 'ACTIVÉ' : 'DÉSACTIVÉ') + '.\n\n' +
+    'Un visiteur ouvre l\'application sans email ni code et voit les cartes des collectes (description, ' +
+    'situation, montants), en lecture seule. Il ne voit ni les dons, ni les donateurs, ni les membres, ni qui a l\'argent.\n\n' +
+    (on ? 'Le désactiver ?' : 'L\'activer ?'), ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+  PropertiesService.getScriptProperties().setProperty('VISITEURS', on ? 'NON' : 'OUI');
+  log_(currentUserEmail_(), 'accès visiteur', on ? 'désactivé' : 'activé');
+  ui.alert('Accès visiteur ' + (on ? 'désactivé.' : 'activé.'));
 }
 
 function menuVerifier() {
@@ -497,6 +517,13 @@ function doPost(e) {
 function route_(b) {
   var action = String(b.action || '');
   if (action === 'login') return login_(b.email, b.code);
+  if (action === 'publicList') {
+    // Visiteur : aucune écriture, aucune donnée sur les dons, les membres ou l'argent
+    if (!visitorEnabled_()) throw apiError_('L\'accès visiteur est désactivé. Connectez-vous avec votre email et votre code.', 'VISITOR_OFF');
+    var pub = list_({ email: '', name: 'Visiteur', role: 'visiteur' });
+    pub.cases.concat(pub.closed).forEach(function (c) { delete c.responsable; });
+    return pub;
+  }
   var user = auth_(b.token);
   var admin = function () { if (user.role !== 'admin') throw apiError_('Réservé aux administrateurs.', 'FORBIDDEN'); };
   switch (action) {
@@ -638,7 +665,7 @@ function list_(user) {
   var cats = {};
   cases.concat(closed).forEach(function (c) { if (c.category) cats[c.category] = true; });
   var out = { user: user, cases: cases, closed: closed, categories: Object.keys(cats), stats: stats, serverTime: iso_(new Date()) };
-  if (user) {
+  if (user && user.role !== 'visiteur') {
     var mem = listMembers_();
     out.money = money_(user, mem, Dn, cases, closed);
     if (user.role === 'admin') out.members = mem.filter(function (m) { return m.active; }).map(function (m) { return { name: m.name, email: m.email }; });

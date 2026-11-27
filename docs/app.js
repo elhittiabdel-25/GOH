@@ -37,6 +37,7 @@
     });
   }
   function dh(n) { return nf.format(Math.round((n || 0) * 100) / 100) + ' Dhs'; }
+  function isVisitor() { return !!(state.session && state.session.visitor); }
   function isAdmin() { return state.session && state.session.user && state.session.user.role === 'admin'; }
   function key(c) { return c.id + '#' + c.cycle; }
   function pct(c) { return c.budget ? Math.min(100, Math.round(c.collected / c.budget * 100)) : null; }
@@ -106,7 +107,7 @@
     }).then(function (j) {
       if (!j.ok) {
         var e = new Error(j.error || 'Erreur inconnue'); e.code = j.code;
-        if (j.code === 'AUTH' && action !== 'login') { logout(); toast(e.message); }
+        if ((j.code === 'AUTH' || j.code === 'VISITOR_OFF') && action !== 'login') { logout(); toast(e.message); }
         throw e;
       }
       return j.data;
@@ -117,7 +118,7 @@
     if (!state.session || state.loading) return Promise.resolve();
     state.loading = true;
     renderRefreshBtn();
-    return api('list').then(function (d) {
+    return api(isVisitor() ? 'publicList' : 'list').then(function (d) {
       state.data = d;
       state.offline = false;
       state.lastSync = new Date().toISOString();
@@ -172,7 +173,15 @@
       '<div class="err" id="loginErr">' + esc(err || '') + '</div>' +
       '<div class="form-foot"><button class="btn primary block" id="loginBtn">Se connecter</button></div>' +
       '<p class="small">Le code vous est communiqué par un administrateur.</p>' +
+      '<div class="or"><span>ou</span></div>' +
+      '<button type="button" class="btn block" id="visitorBtn">Continuer en tant que visiteur</button>' +
+      '<p class="small">Sans connexion, en lecture seule : vous voyez l\'avancement des collectes.</p>' +
       '</form></div>';
+    document.getElementById('visitorBtn').onclick = function () {
+      state.session = { visitor: true, user: { name: 'Visiteur', role: 'visiteur', email: '' } };
+      LS.set('session', state.session);
+      render(); refresh();
+    };
     document.getElementById('loginForm').onsubmit = function (ev) {
       ev.preventDefault();
       var btn = document.getElementById('loginBtn');
@@ -202,7 +211,7 @@
     var scrollY = window.scrollY;
     var html = '<header class="top"><div class="wrap">' +
       '<img src="icons/icon-192.png" alt="">' +
-      '<h1>Gate of Hope<small>' + esc(user.name || '') + (isAdmin() ? ' · admin' : '') + '</small></h1>' +
+      '<h1>Gate of Hope<small>' + (isVisitor() ? 'Visiteur · lecture seule' : esc(user.name || '') + (isAdmin() ? ' · admin' : '')) + '</small></h1>' +
       '<button class="icon-btn' + (state.loading ? ' spin' : '') + '" id="refreshBtn" aria-label="Actualiser">' + ICON.refresh + '</button>' +
       '<button class="icon-btn" id="menuBtn" aria-label="Mon compte">' + ICON.menu + '</button>' +
       '</div></header><main class="wrap">';
@@ -515,6 +524,17 @@
   }
 
   function openMenu() {
+    if (isVisitor()) {
+      openSheet(head('Mode visiteur') +
+        '<p class="muted small">Vous consultez l\'avancement des collectes en lecture seule, sans connexion. ' +
+        'Les membres de Gate of Hope se connectent avec leur email et leur code.</p>' +
+        '<button class="btn primary block" id="mLogin" style="margin-bottom:8px">Se connecter</button>' +
+        '<button class="btn block" id="mRefresh">Actualiser les données</button>' +
+        '<p class="hint">Version ' + esc(NATIVE ? BUILD.version + ' (Android)' : 'web') + ' · <a href="https://elhittiabdel-25.github.io/GOH/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>');
+      document.getElementById('mLogin').onclick = logout;
+      document.getElementById('mRefresh').onclick = function () { closeSheet(); refresh(); };
+      return;
+    }
     var u = state.session.user || {};
     var html = head('Mon compte') +
       '<p>' + esc(u.name) + '<br><span class="muted small">' + esc(u.email) + ' · ' + (u.role === 'admin' ? 'administrateur' : 'membre') + '</span></p>' +
