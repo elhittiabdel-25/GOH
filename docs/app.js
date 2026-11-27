@@ -58,6 +58,17 @@
     if (s < 30 * 86400) return 'il y a ' + Math.floor(s / 86400) + ' jours';
     return 'le ' + fmtDate(iso);
   }
+  /* Suivi de l'argent : absent si le script Apps Script n'est pas encore mis à jour (rien ne s'affiche alors). */
+  function money() { return state.data && state.data.money; }
+  function members() { return (state.data && state.data.members) || []; }
+  function myName() { var m = money(); return m ? m.me : ((state.session && state.session.user) || {}).name; }
+  function memberOptions(selected, except) {
+    return members().filter(function (m) { return m.name !== except; }).map(function (m) {
+      return '<option value="' + esc(m.name) + '"' + (m.name === selected ? ' selected' : '') + '>' + esc(m.name) + '</option>';
+    }).join('');
+  }
+  function amt(n) { return '<span class="amt' + (n < 0 ? ' neg' : '') + '">' + dh(n) + '</span>'; }
+
   function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function short(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 
@@ -290,6 +301,7 @@
       '<div class="nums"><span><b>' + dh(c.collected) + '</b>' + (c.budget ? ' <span class="muted">/ ' + dh(c.budget) + '</span>' : '') + '</span>' +
       '<span class="muted">' + (c.budget ? (c.remaining > 0 ? 'Reste ' + dh(c.remaining) : c.collected > c.budget ? 'Dépassé de ' + dh(c.collected - c.budget) : 'Objectif atteint') : 'Sans objectif fixe') + '</span></div>' +
       (c.situation ? '<p class="situation">' + esc(short(c.situation, 160)) + '</p>' : '') +
+      (c.responsable ? '<p class="small muted resp">Responsable : ' + esc(c.responsable) + '</p>' : '') +
       '</button>';
   }
 
@@ -319,6 +331,7 @@
       '<div>' + (showCase ? '<span class="tag id">' + esc(d.id) + '</span> ' : '') + esc(d.donor || 'Anonyme') + '</div>' +
       (showCase && c ? '<div class="small muted">' + esc(short(c.description, 70)) + '</div>' : '') +
       '<div class="small muted">' + esc(fmtDate(d.date)) + ' · ' + esc(d.mode) + (d.by && !opening ? ' · ' + esc(d.by.split('@')[0]) : '') +
+      (d.holder ? ' · <b>reçu par ' + esc(d.holder) + '</b>' : '') +
       (d.note ? ' · ' + esc(short(d.note, 80)) : '') + '</div></div>' +
       '<div style="text-align:right"><div class="amt">' + (d.amount > 0 ? '+' : '') + dh(d.amount) + '</div>' +
       (!d.cancelled && !opening ? '<button class="link" data-cancel="' + esc(d.ref) + '">Annuler</button>' : d.cancelled ? '<span class="small muted">annulé</span>' : '') +
@@ -451,11 +464,14 @@
       '<div><b>' + (c.budget ? dh(c.budget) : '—') + '</b><span>Budget</span></div>' +
       '<div><b>' + (c.budget ? dh(c.remaining) : '—') + '</b><span>Reste</span></div></div>' +
       (c.situation ? '<p class="situation">' + esc(c.situation) + '</p>' : '') +
-      '<p class="small muted">' + (c.openedAt ? 'Ouverte le ' + esc(fmtDate(c.openedAt)) + ' · ' : '') + 'Mise à jour ' + esc(ago(c.updatedAt)) + '</p>';
+      '<p class="small muted">' + (c.responsable ? 'Responsable : <b>' + esc(c.responsable) + '</b> · ' : '') +
+      (c.openedAt ? 'Ouverte le ' + esc(fmtDate(c.openedAt)) + ' · ' : '') + 'Mise à jour ' + esc(ago(c.updatedAt)) + '</p>';
     if (isAdmin()) {
       html += '<div class="actions"><button class="btn primary" id="aDon">' + ICON.plus + ' Ajouter un don</button>' +
         '<button class="btn" id="aEdit">Modifier</button><button class="btn danger" id="aClose">Clôturer</button></div>' +
-        '<h3>Dons de cette collecte</h3><div id="dons"><div class="skeleton" style="height:60px"></div></div>';
+        whereHtml(key(c)) +
+        '<h3>Dons de cette collecte</h3><div id="dons"><div class="skeleton" style="height:60px"></div></div>' +
+        (money() ? '<div id="mvts"></div>' : '');
     }
     html += historyHtml(c.id, c.cycle);
     openSheet(html, c.id);
@@ -464,6 +480,8 @@
       document.getElementById('aDon').onclick = function () { donationForm(c.id); };
       document.getElementById('aEdit').onclick = function () { caseForm(c); };
       document.getElementById('aClose').onclick = function () { closeForm(c); };
+      bindMoney($sheetInner, function () { openCase(c.id); });
+      loadMovements(c, function () { openCase(c.id); });
       api('donations', { id: c.id }).then(function (list) {
         var box = document.getElementById('dons');
         if (!box || $sheet.dataset.case !== c.id) return;
@@ -486,8 +504,10 @@
     var active = findCase(c.id);
     if (active) html += '<div class="banner">' + esc(c.id) + ' a une collecte en cours (n°' + active.cycle + '). <button class="link" style="color:inherit;font-weight:700" id="goActive">Voir</button></div>';
     else if (isAdmin()) html += '<div class="actions"><button class="btn primary" id="reopen">Relancer une collecte pour ' + esc(c.id) + '</button></div>';
+    if (isAdmin()) html += whereHtml(key(c), true);
     html += historyHtml(c.id, c.cycle);
     openSheet(html);
+    if (isAdmin()) bindMoney($sheetInner, function () { openClosed(c); });
     var ga = document.getElementById('goActive');
     if (ga) ga.onclick = function () { openCase(c.id); };
     var ro = document.getElementById('reopen');
@@ -498,6 +518,7 @@
     var u = state.session.user || {};
     var html = head('Mon compte') +
       '<p>' + esc(u.name) + '<br><span class="muted small">' + esc(u.email) + ' · ' + (u.role === 'admin' ? 'administrateur' : 'membre') + '</span></p>' +
+      moneyHtml() +
       (state.installPrompt ? '<button class="btn block" id="mInstall" style="margin-bottom:8px">Installer l\'application</button>' : '') +
       '<button class="btn block" id="mRefresh" style="margin-bottom:8px">Actualiser les données</button>' +
       '<button class="btn danger block" id="mLogout">Se déconnecter</button>' +
@@ -508,6 +529,167 @@
     document.getElementById('mRefresh').onclick = function () { closeSheet(); refresh(); };
     var mi = document.getElementById('mInstall');
     if (mi) mi.onclick = function () { closeSheet(); state.installPrompt.prompt(); };
+    bindMoney($sheetInner, openMenu);
+  }
+
+  /* ---------------- Argent : qui a quoi ---------------- */
+  function moneyLines(h, canMove) {
+    return '<div class="rows">' + h.lines.map(function (l) {
+      return '<div class="row"><div class="grow"><div><span class="tag id">' + esc(l.id) + '</span>' +
+        (l.closed ? ' <span class="tag done">Clôturée</span>' : '') + '</div>' +
+        '<div class="small muted">' + esc(short(l.description || ('Collecte n°' + l.cycle), 80)) + (l.responsable ? ' · resp. ' + esc(l.responsable) : '') + '</div></div>' +
+        '<div style="text-align:right">' + amt(l.amount) +
+        (l.amount < 0 ? '<div class="small neg">à régulariser</div>' : '') +
+        (canMove && l.amount > 0 ? '<div><button class="link" data-move="' + esc(l.id + '#' + l.cycle) + '" data-from="' + esc(h.name) + '">Remettre…</button></div>' : '') +
+        '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /** Section « Mon argent » (+ « Toute l'équipe » pour les admins) du profil. */
+  function moneyHtml() {
+    var m = money();
+    if (!m) return '';
+    var mine = m.holders.filter(function (h) { return h.name === m.me; })[0];
+    var html = '<h3>Mon argent</h3>';
+    html += mine ? '<div class="money-total">' + amt(mine.total) + '<span>à remettre ou à utiliser, pour ' + mine.lines.length + ' cas</span></div>' + moneyLines(mine, isAdmin())
+      : '<p class="muted small">Vous ne détenez aucun argent pour le moment.</p>';
+    if (isAdmin()) {
+      var others = m.holders.filter(function (h) { return h.name !== m.me; });
+      html += '<h3>Qui a quoi</h3>';
+      if (!others.length) html += '<p class="muted small">Personne d\'autre ne détient d\'argent.</p>';
+      html += others.map(function (h) {
+        var na = h.name === m.unassigned;
+        return '<details class="holder"><summary><span>' + esc(h.name) + '</span>' + amt(h.total) + '</summary>' +
+          (na ? '<p class="hint">Dons enregistrés sans préciser qui a l\'argent (dont ceux d\'avant le suivi). Utilisez « Remettre… » pour les attribuer à quelqu\'un.</p>' : '') +
+          moneyLines(h, true) + '</details>';
+      }).join('');
+    }
+    return html;
+  }
+
+  /** Bloc « Où est l'argent ? » d'une collecte (admins). */
+  function whereHtml(k, onlyIfAny) {
+    var m = money();
+    if (!m || !m.byCase) return '';
+    var w = m.byCase[k];
+    var held = w ? w.held.filter(function (h) { return Math.abs(h.amount) > 0.005; }) : [];
+    if (!held.length && !(w && w.given)) {
+      return onlyIfAny ? '' : '<h3>Où est l\'argent ?</h3><p class="muted small">Aucun argent enregistré pour cette collecte.</p>';
+    }
+    var html = '<h3>Où est l\'argent ?</h3><div class="rows">' + held.map(function (h) {
+      return '<div class="row"><div class="grow">' + esc(h.name) + (h.name === m.me ? ' <span class="small muted">(vous)</span>' : '') +
+        (h.amount < 0 ? '<div class="small neg">à régulariser</div>' : '') + '</div>' + amt(h.amount) + '</div>';
+    }).join('') +
+      (w.given ? '<div class="row"><div class="grow">Remis au bénéficiaire</div><span class="amt">' + dh(w.given) + '</span></div>' : '') + '</div>';
+    if (held.some(function (h) { return h.amount > 0; })) {
+      html += '<div class="actions"><button class="btn" data-move="' + esc(k) + '">Remettre / transférer l\'argent</button></div>';
+    }
+    return html;
+  }
+
+  function bindMoney(root, back) {
+    root.querySelectorAll('[data-move]').forEach(function (b) {
+      b.onclick = function (ev) { ev.stopPropagation(); movementForm(b.dataset.move, b.dataset.from, back); };
+    });
+  }
+
+  function loadMovements(c, back) {
+    if (!money()) return;
+    api('movements', { id: c.id }).then(function (list) {
+      var box = document.getElementById('mvts');
+      if (!box || $sheet.dataset.case !== c.id) return;
+      var cur = list.filter(function (x) { return x.cycle === c.cycle; });
+      if (!cur.length) return;
+      box.innerHTML = '<h3>Argent remis / transféré</h3><div class="rows">' + cur.map(function (x) {
+        return '<div class="row' + (x.cancelled ? ' cancelled' : '') + '"><div class="grow"><div>' + esc(x.from) + ' → ' + esc(x.to === money().beneficiary ? 'bénéficiaire' : x.to) + '</div>' +
+          '<div class="small muted">' + esc(fmtDate(x.date)) + (x.note ? ' · ' + esc(short(x.note, 80)) : '') + '</div></div>' +
+          '<div style="text-align:right"><div class="amt">' + dh(x.amount) + '</div>' +
+          (x.cancelled ? '<span class="small muted">annulé</span>' : '<button class="link" data-cancel-mv="' + esc(x.ref) + '">Annuler</button>') + '</div></div>';
+      }).join('') + '</div>';
+      box.querySelectorAll('[data-cancel-mv]').forEach(function (b) {
+        b.onclick = function () {
+          var reason = window.prompt('Annuler ce mouvement ? Indiquez la raison :', 'Erreur de saisie');
+          if (reason === null) return;
+          b.disabled = true;
+          api('cancelMovement', { ref: b.dataset.cancelMv, reason: reason }).then(function () {
+            toast('Mouvement annulé');
+            return refresh(true).then(back);
+          }).catch(function (e) { b.disabled = false; toast(e.message); });
+        };
+      });
+    }).catch(function () { /* facultatif */ });
+  }
+
+  /** Remettre de l'argent : à un autre membre, ou au bénéficiaire. k = « ID#cycle ». */
+  function movementForm(k, from, back) {
+    var m = money();
+    if (!m || !m.byCase) return;
+    var keys = Object.keys(m.byCase).filter(function (x) {
+      return m.byCase[x].held.some(function (h) { return h.amount > 0.005; });
+    });
+    if (!keys.length) { toast('Personne ne détient d\'argent pour le moment.'); return; }
+    if (keys.indexOf(k) < 0) k = keys[0];
+    var html = head('Remettre de l\'argent') + '<form id="fMv" novalidate>' +
+      '<label for="mCase">Collecte</label><select class="field" id="mCase">' + keys.map(function (x) {
+        var w = m.byCase[x];
+        return '<option value="' + esc(x) + '"' + (x === k ? ' selected' : '') + '>' + esc(w.id + (w.closed ? ' (clôturée)' : '') + ' — ' + short(w.description, 50)) + '</option>';
+      }).join('') + '</select>' +
+      '<label for="mFrom">Qui donne l\'argent ?</label><select class="field" id="mFrom"></select>' +
+      '<label for="mTo">À qui ?</label><select class="field" id="mTo"></select>' +
+      '<label for="mAmt">Montant (Dhs)</label><input class="field amount-input" id="mAmt" inputmode="decimal" autocomplete="off">' +
+      '<div class="hint" id="mInfo"></div>' +
+      '<div class="two"><div><label for="mDate">Date</label><input class="field" id="mDate" type="date" value="' + todayStr() + '" max="' + todayStr() + '"></div>' +
+      '<div><label for="mNote">Note <span class="opt">(facultatif)</span></label><input class="field" id="mNote" autocomplete="off" placeholder="Facture, reçu…"></div></div>' +
+      '<div class="err" id="mErr"></div>' +
+      '<div class="form-foot"><button class="btn primary block" id="mSave">Enregistrer</button>' +
+      '<button type="button" class="btn block" id="mBack">Retour</button></div></form>';
+    openSheet(html, k.split('#')[0]);
+    var $case = document.getElementById('mCase'), $from = document.getElementById('mFrom'), $to = document.getElementById('mTo'), $amt = document.getElementById('mAmt');
+    document.getElementById('mBack').onclick = function () { (back || closeSheet)(); };
+    function has() {
+      var w = m.byCase[$case.value];
+      var h = w.held.filter(function (x) { return x.name === $from.value; })[0];
+      return h ? h.amount : 0;
+    }
+    function fillTo() {
+      var w = m.byCase[$case.value], cur = $to.value;
+      $to.innerHTML = '<option value="' + esc(m.beneficiary) + '">Remis au bénéficiaire (dépensé pour le cas)</option>' +
+        (w.responsable && w.responsable !== $from.value ? '<option value="' + esc(w.responsable) + '">' + esc(w.responsable) + ' (responsable du cas)</option>' : '') +
+        memberOptions(null, $from.value);
+      if (cur && cur !== $from.value) $to.value = cur;
+      if (!$to.value) $to.selectedIndex = 0;
+      $amt.value = has() > 0 ? String(has()) : '';
+      document.getElementById('mInfo').textContent = $from.value + ' détient ' + dh(has()) + ' pour ' + w.id + '.';
+    }
+    function fillFrom(pref) {
+      var w = m.byCase[$case.value];
+      var pos = w.held.filter(function (h) { return h.amount > 0.005; });
+      $from.innerHTML = pos.map(function (h) { return '<option value="' + esc(h.name) + '">' + esc(h.name + ' — ' + dh(h.amount)) + '</option>'; }).join('');
+      var names = pos.map(function (h) { return h.name; });
+      $from.value = names.indexOf(pref) >= 0 ? pref : names.indexOf(m.me) >= 0 ? m.me : names[0];
+      fillTo();
+    }
+    $case.onchange = function () { fillFrom(); };
+    $from.onchange = fillTo;
+    fillFrom(from);
+    document.getElementById('fMv').onsubmit = function (ev) {
+      ev.preventDefault();
+      var err = document.getElementById('mErr'), btn = document.getElementById('mSave');
+      var amount = Number(String($amt.value).replace(/\s/g, '').replace(',', '.'));
+      if (!(amount > 0)) { err.textContent = 'Indiquez un montant valide.'; return; }
+      if (amount > has() + 0.005) { err.textContent = $from.value + ' ne détient que ' + dh(has()) + '.'; return; }
+      var w = m.byCase[$case.value];
+      var toLabel = $to.value === m.beneficiary ? 'le bénéficiaire' : $to.value;
+      if (!window.confirm($from.value + ' remet ' + dh(amount) + ' à ' + toLabel + ' pour ' + w.id + ' ?')) return;
+      busy(btn, true, 'Enregistrement…'); err.textContent = '';
+      api('addMovement', {
+        id: w.id, cycle: w.cycle, from: $from.value, to: $to.value, amount: amount,
+        date: document.getElementById('mDate').value, note: document.getElementById('mNote').value
+      }).then(function () {
+        toast(dh(amount) + ' : ' + $from.value + ' → ' + toLabel);
+        return refresh(true).then(function () { (back || closeSheet)(); });
+      }).catch(function (e) { busy(btn, false, 'Enregistrer'); err.textContent = e.message; });
+    };
   }
 
   /* ---------------- Formulaires ---------------- */
@@ -526,6 +708,7 @@
       '<div class="quick">' + [100, 200, 500, 1000, 2000].map(function (v) { return '<button type="button" data-q="' + v + '">' + nf.format(v) + '</button>'; }).join('') + '</div>' +
       '<div class="two"><div><label for="dDate">Date</label><input class="field" id="dDate" type="date" value="' + todayStr() + '" max="' + todayStr() + '"></div>' +
       '<div><label for="dMode">Mode</label><select class="field" id="dMode">' + ['Espèces', 'Virement', 'Chèque', 'Carte', 'Autre'].map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div></div>' +
+      (members().length ? '<label for="dHolder">Qui a l\'argent ?</label><select class="field" id="dHolder">' + memberOptions(myName()) + '</select>' : '') +
       '<label for="dDonor">Donateur <span class="opt">(facultatif)</span></label><input class="field" id="dDonor" placeholder="Anonyme" autocomplete="off">' +
       '<label for="dNote">Note <span class="opt">(facultatif)</span></label><input class="field" id="dNote" autocomplete="off">' +
       '<div class="err" id="dErr"></div>' +
@@ -547,12 +730,13 @@
       if (!$case.value) { err.textContent = 'Choisissez la collecte.'; return; }
       if (!(amount > 0)) { err.textContent = 'Indiquez un montant valide.'; return; }
       var c = findCase($case.value);
-      if (!window.confirm('Enregistrer ' + dh(amount) + ' pour ' + c.id + ' ?')) return;
+      var $h = document.getElementById('dHolder');
+      if (!window.confirm('Enregistrer ' + dh(amount) + ' pour ' + c.id + ($h ? ' (argent chez ' + $h.value + ')' : '') + ' ?')) return;
       busy(btn, true, 'Enregistrement…'); err.textContent = '';
       api('addDonation', {
         id: $case.value, amount: amount, date: document.getElementById('dDate').value,
         mode: document.getElementById('dMode').value, donor: document.getElementById('dDonor').value,
-        note: document.getElementById('dNote').value
+        note: document.getElementById('dNote').value, holder: $h ? $h.value : undefined
       }).then(function (r) {
         toast('Don de ' + dh(amount) + ' enregistré pour ' + c.id);
         if (r.case) replaceCase(r.case);
@@ -594,6 +778,8 @@
       '<label for="cBud">Budget global nécessaire (Dhs) <span class="opt">(vide si pas d\'objectif fixe)</span></label>' +
       '<input class="field" id="cBud" inputmode="decimal" value="' + (editing && c.budget !== null ? esc(c.budget) : '') + '">' +
       '<label for="cSit">Situation actuelle <span class="opt">(facultatif)</span></label><textarea class="field" id="cSit" style="min-height:70px">' + esc(editing ? c.situation : '') + '</textarea>' +
+      (members().length ? '<label for="cResp">Responsable du cas</label><select class="field" id="cResp"><option value="">— Aucun —</option>' +
+        memberOptions(editing ? c.responsable : (base.responsable || myName())) + '</select>' : '') +
       '<div class="err" id="cErr"></div><div class="form-foot"><button class="btn primary block" id="cSave">' + (editing ? 'Enregistrer' : 'Créer la collecte') + '</button>' +
       '<button type="button" class="btn block" data-close>Annuler</button></div></form>';
     openSheet(html, editing ? c.id : '');
@@ -639,6 +825,8 @@
       if (!desc) { err.textContent = 'La description est obligatoire.'; return; }
       if (budRaw && !(Number(budRaw) >= 0)) { err.textContent = 'Budget invalide.'; return; }
       var payload = { category: cat, description: desc, budget: budRaw === '' ? '' : Number(budRaw), situation: document.getElementById('cSit').value.trim() };
+      var $resp = document.getElementById('cResp');
+      if ($resp) payload.responsable = $resp.value;
       busy(btn, true, 'Enregistrement…'); err.textContent = '';
       var p = editing ? api('updateCase', Object.assign({ id: c.id }, payload)) : api('createCase', Object.assign({ reuseId: reuse }, payload));
       p.then(function (r) {
@@ -651,9 +839,18 @@
     };
   }
 
+  function heldWarning(k) {
+    var m = money(), w = m && m.byCase && m.byCase[k];
+    var held = w ? w.held.filter(function (h) { return h.amount > 0.005; }) : [];
+    if (!held.length) return '';
+    return '<div class="banner">Argent encore détenu pour ce cas : ' + held.map(function (h) { return esc(h.name) + ' ' + dh(h.amount); }).join(', ') +
+      '. Vous pouvez clôturer quand même : il restera visible dans « Mon compte » jusqu\'à sa remise.</div>';
+  }
+
   function closeForm(c) {
     var html = head('Clôturer ' + c.id) +
       '<p class="muted small">La collecte sera déplacée vers l\'onglet « PROJETS.OLD CLAUDE » du Google Sheet avec un montant final de <b>' + dh(c.collected) + '</b>. Si ce cas revient, vous pourrez la relancer avec le même ID.</p>' +
+      heldWarning(key(c)) +
       '<form id="fClose"><label for="xSit">Situation finale</label><textarea class="field" id="xSit">' +
       esc(c.situation ? c.situation + ' => Collecte clôturée' : 'Collecte clôturée') + '</textarea>' +
       '<div class="err" id="xErr"></div><div class="form-foot"><button class="btn primary block" id="xSave" style="background:var(--danger);border-color:var(--danger)">Clôturer la collecte</button>' +

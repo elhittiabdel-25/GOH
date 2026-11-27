@@ -190,4 +190,120 @@ t('onglets d\'origine inchangés', () => {
   assert.deepStrictEqual(sheet('PROJETS').getDataRange().getValues().length, fixture['PROJETS'].length);
   assert.deepStrictEqual(sheet('PROJETS.OLD').getDataRange().getValues().length, fixture['PROJETS.OLD'].length);
 });
+console.log('Suivi de l\'argent (qui a quoi)');
+const money = () => ok(g.api({ action: 'list', token: T })).money;
+const held = (who, id, cycle) => {
+  const h = money().holders.find((x) => x.name === who);
+  const l = h && h.lines.find((x) => x.id === id && x.cycle === cycle);
+  return l ? l.amount : 0;
+};
+const adminName = sheet('MEMBRES').getRange(2, 1).getValues()[0][0];
+sheet('MEMBRES').appendRow(['Merieme', 'merieme@example.org', 'admin', 'MERIEME1', 'OUI']);
+sheet('MEMBRES').appendRow(['Abdelkrim', 'abdelkrim@example.org', 'admin', 'ABDELKR1', 'OUI']);
+let mc;
+t('colonnes ajoutées à droite, onglet MOUVEMENTS créé', () => {
+  assert.strictEqual(sheet('DONS').getRange(1, 12).getValues()[0][0], "Qui a l'argent");
+  assert.strictEqual(sheet('PROJETS CLAUDE').getRange(1, 11).getValues()[0][0], 'Responsable');
+  assert.ok(sheet('MOUVEMENTS'));
+});
+t('l\'historique (sans détenteur) apparaît comme « Non attribué »', () => {
+  const m = money();
+  assert.strictEqual(m.me, adminName);
+  const na = m.holders.find((h) => h.name === 'Non attribué');
+  assert.ok(na && na.total > 0);
+  assert.strictEqual(m.holders[m.holders.length - 1].name, 'Non attribué');
+});
+t('nouvelle collecte : responsable choisi', () => {
+  mc = ok(g.api({ action: 'createCase', token: T, category: 'Cas médicaux', description: 'Cas suivi (test argent)', budget: 5000, responsable: 'abdelkrim' })).case;
+  assert.strictEqual(mc.responsable, 'Abdelkrim');
+  assert.strictEqual(rows('PROJETS CLAUDE').find((r) => r[0] === mc.id)[0], mc.id);
+});
+t('responsable inconnu refusé', () => {
+  assert.strictEqual(g.api({ action: 'updateCase', token: T, id: mc.id, responsable: 'Inconnu' }).ok, false);
+});
+t('don : 200 Dhs reçus par l\'admin pour le cas d\'Abdelkrim', () => {
+  const r = ok(g.api({ action: 'addDonation', token: T, id: mc.id, amount: 200, holder: adminName }));
+  assert.strictEqual(r.case.collected, 200);
+  assert.strictEqual(held(adminName, mc.id, mc.cycle), 200);
+});
+t('don sans détenteur indiqué => chez la personne qui le saisit', () => {
+  ok(g.api({ action: 'addDonation', token: T, id: mc.id, amount: 300 }));
+  assert.strictEqual(held(adminName, mc.id, mc.cycle), 500);
+});
+t('don reçu par Merieme', () => {
+  ok(g.api({ action: 'addDonation', token: T, id: mc.id, amount: 150, holder: 'merieme@example.org' }));
+  assert.strictEqual(held('Merieme', mc.id, mc.cycle), 150);
+  assert.strictEqual(ok(g.api({ action: 'donations', token: T, id: mc.id }))[0].holder, 'Merieme');
+});
+t('montant collecté inchangé par le suivi (formule)', () => {
+  assert.strictEqual(rows('PROJETS CLAUDE').find((r) => r[0] === mc.id)[4], 650);
+});
+let mvRef;
+t('transfert : l\'admin remet 200 Dhs à Abdelkrim', () => {
+  mvRef = ok(g.api({ action: 'addMovement', token: T, id: mc.id, from: adminName, to: 'Abdelkrim', amount: 200 })).ref;
+  assert.ok(/^MVT-/.test(mvRef));
+  assert.strictEqual(held(adminName, mc.id, mc.cycle), 300);
+  assert.strictEqual(held('Abdelkrim', mc.id, mc.cycle), 200);
+});
+t('transfert supérieur à ce qu\'on détient refusé', () => {
+  const r = g.api({ action: 'addMovement', token: T, id: mc.id, from: 'Merieme', to: 'Abdelkrim', amount: 151 });
+  assert.strictEqual(r.ok, false);
+  assert.ok(/ne détient que 150/.test(r.error), r.error);
+});
+t('remise au bénéficiaire', () => {
+  ok(g.api({ action: 'addMovement', token: T, id: mc.id, from: 'Abdelkrim', to: 'Bénéficiaire', amount: 200, note: 'Facture clinique' }));
+  const m = money();
+  assert.strictEqual(held('Abdelkrim', mc.id, mc.cycle), 0);
+  const w = m.byCase[mc.id + '#' + mc.cycle];
+  assert.strictEqual(w.given, 200);
+  assert.deepStrictEqual(w.held.map((h) => h.name).sort(), [adminName, 'Merieme'].sort());
+  assert.strictEqual(ok(g.api({ action: 'list', token: T })).cases.find((c) => c.id === mc.id).collected, 650);
+});
+t('annulation d\'un mouvement => soldes rétablis', () => {
+  const mv = ok(g.api({ action: 'movements', token: T, id: mc.id }));
+  assert.strictEqual(mv.length, 2);
+  ok(g.api({ action: 'cancelMovement', token: T, ref: mv[0].ref, reason: 'test' }));
+  assert.strictEqual(held('Abdelkrim', mc.id, mc.cycle), 200);
+});
+t('attribuer de l\'argent « Non attribué » à quelqu\'un', () => {
+  const na = money().holders.find((h) => h.name === 'Non attribué');
+  const l = na.lines.find((x) => x.amount > 0);
+  ok(g.api({ action: 'addMovement', token: T, id: l.id, cycle: l.cycle, from: 'Non attribué', to: 'Merieme', amount: l.amount }));
+  assert.strictEqual(held('Merieme', l.id, l.cycle), l.amount);
+});
+t('clôture avec de l\'argent encore détenu : avertissement, l\'argent reste visible', () => {
+  const r = ok(g.api({ action: 'closeCase', token: T, id: mc.id }));
+  assert.ok(r.held.some((h) => h.name === 'Merieme' && h.amount === 150));
+  assert.strictEqual(rows('PROJETS.OLD CLAUDE')[0][0], mc.id);
+  assert.strictEqual(sheet('PROJETS.OLD CLAUDE').getRange(2, 11).getValues()[0][0], 'Abdelkrim');
+  const l = money().holders.find((h) => h.name === 'Merieme').lines.find((x) => x.id === mc.id);
+  assert.ok(l.closed);
+  ok(g.api({ action: 'addMovement', token: T, id: mc.id, from: 'Merieme', to: 'Bénéficiaire', amount: 150 }));
+  assert.strictEqual(held('Merieme', mc.id, mc.cycle), 0);
+});
+t('un membre voit seulement son propre argent et ne peut pas faire de mouvement', () => {
+  sheet('MEMBRES').appendRow(['Membre argent', 'm2@example.org', 'membre', 'MEMBRE22', 'OUI']);
+  const c = ok(g.api({ action: 'list', token: T })).cases[0];
+  ok(g.api({ action: 'addDonation', token: T, id: c.id, amount: 75, holder: 'Membre argent' }));
+  const mem = ok(g.api({ action: 'login', email: 'm2@example.org', code: 'MEMBRE22' }));
+  const l = ok(g.api({ action: 'list', token: mem.token }));
+  assert.strictEqual(l.money.byCase, null);
+  assert.strictEqual(l.members, undefined);
+  assert.deepStrictEqual(l.money.holders.map((h) => h.name), ['Membre argent']);
+  assert.strictEqual(g.api({ action: 'addMovement', token: mem.token, id: c.id, from: 'Membre argent', to: 'Merieme', amount: 10 }).code, 'FORBIDDEN');
+});
+t('ancienne installation (v1.0) mise à niveau sans toucher aux données', () => {
+  const before = rows('PROJETS CLAUDE').map((r) => [r[0], r[4], r[5]]);
+  sheet('DONS').getRange(1, 12).setValue('');
+  sheet('PROJETS CLAUDE').getRange(1, 11).setValue('');
+  g.__ss.sheets = g.__ss.sheets.filter((s) => s.name !== 'MOUVEMENTS');
+  g.PropertiesService.getScriptProperties().setProperty('SCHEMA', '');
+  const l = ok(g.api({ action: 'list', token: T }));
+  assert.strictEqual(sheet('DONS').getRange(1, 12).getValues()[0][0], "Qui a l'argent");
+  assert.strictEqual(sheet('PROJETS CLAUDE').getRange(1, 11).getValues()[0][0], 'Responsable');
+  assert.ok(sheet('MOUVEMENTS'));
+  assert.ok(l.money.holders.length > 0);
+  assert.deepStrictEqual(rows('PROJETS CLAUDE').map((r) => [r[0], r[4], r[5]]), before);
+});
+
 console.log(`\n${passed} tests réussis`);
