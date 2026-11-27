@@ -306,4 +306,24 @@ t('ancienne installation (v1.0) mise à niveau sans toucher aux données', () =>
   assert.deepStrictEqual(rows('PROJETS CLAUDE').map((r) => [r[0], r[4], r[5]]), before);
 });
 
+console.log('Accès visiteur');
+t('un visiteur voit les cartes sans connexion, sans données sensibles', () => {
+  const l = ok(g.api({ action: 'publicList' }));
+  assert.ok(l.cases.length > 0);
+  assert.strictEqual(l.user.role, 'visiteur');
+  assert.strictEqual(l.money, undefined);
+  assert.strictEqual(l.members, undefined);
+  assert.strictEqual(JSON.stringify(l).indexOf('@'), -1, 'aucun email exposé');
+  assert.ok(l.cases.concat(l.closed).every((c) => c.responsable === undefined), 'aucun nom de membre exposé');
+});
+t('un visiteur ne peut rien faire d\'autre', () => {
+  ['list', 'donations', 'addDonation', 'addMovement', 'createCase', 'closeCase', 'recentDonations', 'movements'].forEach((a) =>
+    assert.strictEqual(g.api({ action: a, id: 'MED-001', amount: 10 }).code, 'AUTH', a));
+});
+t('accès visiteur désactivable', () => {
+  g.PropertiesService.getScriptProperties().setProperty('VISITEURS', 'NON');
+  assert.strictEqual(g.api({ action: 'publicList' }).code, 'VISITOR_OFF');
+  g.PropertiesService.getScriptProperties().setProperty('VISITEURS', 'OUI');
+  assert.ok(g.api({ action: 'publicList' }).ok);
+});
 console.log(`\n${passed} tests réussis`);

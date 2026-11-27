@@ -227,3 +227,7 @@ details.holder[open] > summary::after { content: '▴'; }
 details.holder > .rows, details.holder > .hint { margin: 0 10px 10px; }
 .card .resp { margin: 6px 0 0; }
 details.holder > summary > span:first-child { flex: 1; }
+
+/* ---------- Accès visiteur ---------- */
+.or { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
